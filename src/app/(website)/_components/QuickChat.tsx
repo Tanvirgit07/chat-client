@@ -32,19 +32,23 @@ const QuickChat: React.FC = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
-      {/* Sidebar Component */}
-      <Sidebar
-        users={users}
-        selectedUser={selectedUser}
-        onSelectUser={setSelectedUser}
-      />
+    <div className="flex items-center justify-center h-screen w-full">
+      <div className="flex w-[60%] h-[75%] shadow-xl rounded-xl overflow-hidden border">
+        {/* Sidebar */}
+        <Sidebar
+          users={users}
+          selectedUser={selectedUser}
+          onSelectUser={setSelectedUser}
+        />
 
-      {/* Middle Section */}
-      {!selectedUser ? <EmptyState /> : <ChatArea selectedUser={selectedUser} />}
-      
-      {/* Profile Panel */}
-      {selectedUser && <ProfilePanel selectedUser={selectedUser} />}
+        {/* Chat Area / Empty State */}
+        <div className="flex-1 flex">
+          {!selectedUser ? <EmptyState /> : <ChatArea selectedUser={selectedUser} />}
+        </div>
+
+        {/* Profile Panel */}
+        {selectedUser && <ProfilePanel selectedUser={selectedUser} />}
+      </div>
     </div>
   );
 };
