@@ -59,7 +59,7 @@ function ProfilePage() {
           {/* Profile Image Upload */}
           <div className="flex items-center gap-4 mb-6">
             <label htmlFor="profile-upload" className="cursor-pointer">
-              <div className="w-20 h-20 bg-gray-400 rounded-full flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity">
+              <div className="w-[100px] h-[100px] bg-gray-400 rounded-full flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity">
                 {profileImage ? (
                   <Image
                     width={400}
