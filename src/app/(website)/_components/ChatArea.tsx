@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Send, Image as ImageIcon, Info } from "lucide-react";
+import { Send, Image as ImageIcon } from "lucide-react";
 import { User, ChatMessage } from "./QuickChat";
 import Image from "next/image";
 import { useMutation } from "@tanstack/react-query";
@@ -39,33 +39,29 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           headers: { Authorization: `Bearer ${TOKEN}` },
         }
       );
-      if (!res.ok) throw new Error("Failed to send");
+      if (!res.ok) throw new Error("Failed");
       return res.json();
-    },
-    onSuccess: (data) => {
-      if (data?.data) {
-        // রিয়েল মেসেজ দিয়ে টেম্প মেসেজ রিপ্লেস করো
-        onMessageSent?.(data.data);
-      }
     },
   });
 
   const handleSend = () => {
     if (!text.trim() && selectedFiles.length === 0) return;
 
-    const tempId = "temp-" + Date.now();
-    const optimisticMessage: ChatMessage = {
+    const tempId = `temp_${Date.now()}`;
+    const tempMessage: ChatMessage = {
       _id: tempId,
       senderId: myId,
       receiverId: selectedUser.id,
       text: text || undefined,
-      image: selectedFiles[0] ? URL.createObjectURL(selectedFiles[0]) : undefined,
+      image: selectedFiles[0]
+        ? URL.createObjectURL(selectedFiles[0])
+        : undefined,
       createdAt: new Date().toISOString(),
       seen: true,
     };
 
-    // ইনস্ট্যান্ট দেখাও (সেন্ডারের জন্য)
-    onMessageSent?.(optimisticMessage);
+    // শুধু এই একবারই onMessageSent কল হবে (ইনস্ট্যান্ট দেখানোর জন্য)
+    onMessageSent?.(tempMessage);
 
     const formData = new FormData();
     formData.append("text", text);
@@ -73,21 +69,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
     sendMessageMutation.mutate(formData, {
       onSuccess: (res) => {
-        const realMsg = res.data;
-        // টেম্প মেসেজ রিপ্লেস করো
-        onMessageSent?.(realMsg);
+        const realMessage = res?.data as ChatMessage;
+        if (realMessage?._id) {
+          onMessageSent?.(realMessage); // এইটাই যথেষ্ট
+        }
         setText("");
         setSelectedFiles([]);
       },
-      onError: () => {
-        // এরর হলে টেম্প মেসেজ মুছে ফেলো (অপশনাল)
-        // setMessages(prev => prev.filter(m => m._id !== tempId));
-      },
     });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setSelectedFiles(Array.from(e.target.files));
   };
 
   useEffect(() => {
@@ -97,78 +86,103 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
-      <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 p-4 flex items-center justify-between">
+      <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 p-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl overflow-hidden bg-gray-600">
             {selectedUser.profileImage ? (
-              <Image width={40} height={40} src={selectedUser.profileImage} alt="" className="w-full h-full object-cover" />
+              <Image
+                width={40}
+                height={40}
+                src={selectedUser.profileImage}
+                alt={selectedUser.name}
+                className="w-full h-full object-cover rounded-full"
+              />
             ) : (
-              <div className="w-full h-full bg-gray-600 flex items-center justify-center text-xl">
-                {selectedUser.avatar}
-              </div>
+              <span className="text-white font-bold text-lg">
+                {selectedUser.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase()}
+              </span>
             )}
           </div>
           <h3 className="text-white font-semibold">{selectedUser.name}</h3>
         </div>
-        <Info className="text-gray-400" size={20} />
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
-        {messages.length === 0 ? (
-          <p className="text-gray-400 text-center">No messages yet</p>
-        ) : (
-          messages.map((msg) => (
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+        {messages.map((msg) => (
+          <div
+            key={msg._id}
+            className={`flex ${
+              msg.senderId === myId ? "justify-end" : "justify-start"
+            }`}
+          >
             <div
-              key={msg._id}
-              className={`flex ${msg.senderId === myId ? "justify-end" : "justify-start"}`}
+              className={`max-w-[70%] rounded-2xl px-4 py-3 break-all ${
+                msg.senderId === myId
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-700 text-white"
+              }`}
             >
-              <div
-                className={`max-w-[70%] rounded-lg px-4 py-2 break-words ${
-                  msg.senderId === myId
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-700 text-white"
-                }`}
-              >
-                {msg.text && <p>{msg.text}</p>}
-                {msg.image && (
-                  <Image
-                    width={300}
-                    height={300}
-                    src={msg.image}
-                    alt="sent"
-                    className="mt-2 rounded max-w-full"
-                  />
-                )}
-              </div>
+              {msg.text && <p>{msg.text}</p>}
+              {msg.image && (
+                <Image
+                  width={300}
+                  height={300}
+                  src={msg.image}
+                  alt="sent"
+                  className="mt-2 rounded-lg max-w-full"
+                />
+              )}
             </div>
-          ))
-        )}
+          </div>
+        ))}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
       <div className="bg-black/40 backdrop-blur-xl border-t border-purple-500/20 p-4">
         <div className="flex items-center gap-3">
-          <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileChange} />
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            onChange={(e) =>
+              e.target.files && setSelectedFiles(Array.from(e.target.files))
+            }
+          />
           <button
             onClick={() => fileInputRef.current?.click()}
             className="text-gray-400 hover:text-white"
           >
             <ImageIcon size={22} />
           </button>
+
           <input
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
+            onKeyDown={(e) =>
+              e.key === "Enter" &&
+              !e.shiftKey &&
+              (e.preventDefault(), handleSend())
+            }
             placeholder="Type a message..."
-            className="flex-1 bg-purple-900/30 text-white placeholder-gray-500 rounded-full py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="flex-1 bg-purple-900/30 text-white placeholder-gray-500 rounded-full py-3 px-4 focus:outline-none"
           />
+
           <button
             onClick={handleSend}
-            disabled={sendMessageMutation.isPending}
-            className="bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 disabled:opacity-50"
+            disabled={
+              sendMessageMutation.isPending ||
+              (!text.trim() && selectedFiles.length === 0)
+            }
+            className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-full p-3"
           >
             <Send size={20} />
           </button>

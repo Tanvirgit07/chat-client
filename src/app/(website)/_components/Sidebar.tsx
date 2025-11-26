@@ -92,18 +92,25 @@ const Sidebar: React.FC<SidebarProps> = ({
             }`}
           >
             <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-xl overflow-hidden">
-              {user.profileImage ? (
-                <Image
-                  width={40}
-                  height={40}
-                  src={user.profileImage}
-                  alt={user.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                user.avatar
-              )}
-            </div>
+  {user.profileImage ? (
+    <Image
+      width={40}
+      height={40}
+      src={user.profileImage}
+      alt={user.name}
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <span className="text-white font-bold text-lg">
+      {user.name
+        .split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()}
+    </span>
+  )}
+</div>
             <div className="flex-1">
               <h3 className="text-white font-medium">{user.name}</h3>
               <p className="text-gray-400 text-sm">{user.status || "Offline"}</p>

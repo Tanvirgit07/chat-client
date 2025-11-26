@@ -31,7 +31,6 @@ export interface ChatMessage {
   seen?: boolean;
 }
 
-// Define SessionUser type
 interface SessionUser {
   _id: string;
   name?: string | null;
@@ -49,7 +48,6 @@ const QuickChat: React.FC = () => {
 
   const { data: session, status } = useSession();
 
-  // Fix _id TypeScript issue
   const rawUser = session?.user as unknown;
   const user: SessionUser | undefined = rawUser
     ? {
@@ -65,7 +63,7 @@ const QuickChat: React.FC = () => {
   const TOKEN = user?.accessToken;
   const myId = user?._id || "";
 
-  // Fetch all users
+  // Fetch users
   const { data: userData } = useQuery({
     queryKey: ["userData"],
     enabled: status === "authenticated" && !!TOKEN,
@@ -85,7 +83,7 @@ const QuickChat: React.FC = () => {
     },
   });
 
-  // Fetch messages of selected user
+  // Fetch messages
   const { data: selectedUserData } = useQuery({
     queryKey: ["selectedUserData", selectedUser?.id],
     enabled: !!selectedUser && status === "authenticated" && !!TOKEN,
@@ -100,12 +98,11 @@ const QuickChat: React.FC = () => {
           },
         }
       );
-      if (!res.ok) throw new Error("Failed to fetch selected user messages");
+      if (!res.ok) throw new Error("Failed to fetch messages");
       return res.json();
     },
   });
 
-  // Mutation to mark messages as seen
   const markMessageAsSeen = useMutation({
     mutationFn: async (messageIds: string[]) => {
       const res = await fetch(
@@ -119,18 +116,18 @@ const QuickChat: React.FC = () => {
           body: JSON.stringify({ messageIds }),
         }
       );
-      if (!res.ok) throw new Error("Failed to mark messages as seen");
+      if (!res.ok) throw new Error("Failed to mark as seen");
       return res.json();
     },
   });
 
-  // Map API users to frontend users with online status
+  // Update users list with online status
   useEffect(() => {
     if (userData?.users) {
       const mappedUsers: User[] = userData.users.map((u: any) => ({
         id: u._id,
         name: u.fullName,
-        avatar: u.profileImage || "👤",
+        avatar: u.profileImage || "User",
         email: u.email,
         profileImage: u.profileImage,
         status: onlineUsers.includes(u._id) ? "Online" : "Offline",
@@ -139,14 +136,15 @@ const QuickChat: React.FC = () => {
     }
   }, [userData, onlineUsers]);
 
-  // Update messages when selectedUserData changes
+  // Load messages from API
   useEffect(() => {
     if (selectedUserData?.message) {
       setMessages(selectedUserData.message);
 
       const unseenIds = selectedUserData.message
         .filter((msg: ChatMessage) => !msg.seen && msg.receiverId === myId)
-        .map((msg: ChatMessage) => msg._id!);
+        .map((msg: ChatMessage) => msg._id!)
+        .filter(Boolean);
 
       if (unseenIds.length > 0) {
         markMessageAsSeen.mutate(unseenIds);
@@ -154,33 +152,43 @@ const QuickChat: React.FC = () => {
     }
   }, [selectedUserData, myId]);
 
-  // Socket for online users and new messages
+  // Socket: শুধু অন্যের মেসেজ এড করো
   useSocket(
-  (message: ChatMessage) => {
-    // শুধুমাত্র অন্য কেউ পাঠালে (আমি নিজে না) তবেই যোগ করো
-    if (message.senderId !== myId) {
-      setMessages((prev) => [...prev, message]);
-
-      // যদি আমার কাছে আসে এবং seen না থাকে
-      if (message.receiverId === myId && !message.seen) {
-        markMessageAsSeen.mutate([message._id!]);
+    (message: ChatMessage) => {
+      if (message.senderId !== myId) {
+        setMessages((prev) => [...prev, message]);
+        if (!message.seen && message._id) {
+          markMessageAsSeen.mutate([message._id]);
+        }
       }
+    },
+    (onlineIds) => setOnlineUsers(onlineIds)
+  );
+
+  // এই ফাংশনটা শুধু ChatArea থেকে কল হবে
+  const handleNewMessage = (message: ChatMessage) => {
+    // যদি temp message হয় (temp_ দিয়ে শুরু) → শুধু add করো
+    // যদি real message হয় → temp টা রিপ্লেস করো
+    const isTemp = typeof message._id === "string" && message._id.startsWith("temp_");
+
+    if (isTemp) {
+      setMessages((prev) => [...prev, message]);
+    } else {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          typeof msg._id === "string" && msg._id.startsWith("temp_")
+            ? message
+            : msg
+        )
+      );
     }
-  },
-  (onlineIds) => setOnlineUsers(onlineIds)
-);
+  };
 
   return (
     <div className="flex items-center justify-center h-screen w-full">
       <div className="flex w-[60%] h-[75%] shadow-xl rounded-xl overflow-hidden border">
-        {/* Sidebar */}
-        <Sidebar
-          users={users}
-          selectedUser={selectedUser}
-          onSelectUser={setSelectedUser}
-        />
+        <Sidebar users={users} selectedUser={selectedUser} onSelectUser={setSelectedUser} />
 
-        {/* Chat Area / Empty State */}
         <div className="flex-1 flex">
           {!selectedUser ? (
             <EmptyState />
@@ -189,12 +197,11 @@ const QuickChat: React.FC = () => {
               selectedUser={selectedUser}
               messages={messages}
               myId={myId}
-              onMessageSent={(msg) => setMessages((prev) => [...prev, msg])}
+              onMessageSent={handleNewMessage}   // এইটা চেঞ্জ করা হয়েছে
             />
           )}
         </div>
 
-        {/* Profile Panel */}
         {selectedUser && <ProfilePanel selectedUser={selectedUser} />}
       </div>
     </div>
