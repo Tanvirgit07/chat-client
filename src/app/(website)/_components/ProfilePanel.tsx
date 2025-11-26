@@ -3,6 +3,7 @@
 import React from "react";
 import { User } from "./QuickChat";
 import Image from "next/image";
+import { ScrollArea } from "@/components/ui/scroll-area"; // এই লাইনটা যোগ করো
 
 interface ProfilePanelProps {
   selectedUser: User;
@@ -21,6 +22,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ selectedUser, sharedMedia }
 
   return (
     <div className="w-96 bg-black/50 backdrop-blur-2xl border-l border-purple-500/30 flex flex-col">
+      {/* Header - কোনো চেঞ্জ নেই */}
       <div className="p-8 text-center border-b border-purple-500/20">
         <div className="w-40 h-40 mx-auto mb-6 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shadow-2xl">
           {selectedUser.profileImage ? (
@@ -45,34 +47,38 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ selectedUser, sharedMedia }
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <h3 className="text-white text-xl font-bold mb-6">Shared Media</h3>
-        
-        {sharedMedia.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No media shared yet</p>
-            <p className="text-gray-600 text-sm mt-2">Send photos to see them here</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-3">
-            {sharedMedia.map((url, index) => (
-              <div
-                key={index}
-                className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer shadow-lg"
-              >
-                <Image
-                  fill
-                  src={url}
-                  alt="Shared media"
-                  className="object-cover transition-all duration-300 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Shared Media - শুধু ScrollArea যোগ করা হয়েছে */}
+      <ScrollArea className="flex-1 px-6">
+        <div className="py-6">
+          <h3 className="text-white text-xl font-bold mb-6">Shared Media</h3>
+          
+          {sharedMedia.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">No media shared yet</p>
+              <p className="text-gray-600 text-sm mt-2">Send photos to see them here</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {sharedMedia.map((url, index) => (
+                <div
+                  key={index}
+                  className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer shadow-lg"
+                >
+                  <Image
+                    fill
+                    src={url}
+                    alt="Shared media"
+                    className="object-cover transition-all duration-300 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
+      {/* Footer - কোনো চেঞ্জ নেই */}
       <div className="p-6 border-t border-purple-500/20">
         <button className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white font-bold py-4 rounded-2xl transition-all transform hover:scale-105 shadow-lg">
           Block User
