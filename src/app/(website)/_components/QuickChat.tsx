@@ -45,6 +45,7 @@ const QuickChat: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sharedMedia, setSharedMedia] = useState<string[]>([]); // নতুন
 
   const { data: session, status } = useSession();
 
@@ -63,7 +64,6 @@ const QuickChat: React.FC = () => {
   const TOKEN = user?.accessToken;
   const myId = user?._id || "";
 
-  // Fetch users
   const { data: userData } = useQuery({
     queryKey: ["userData"],
     enabled: status === "authenticated" && !!TOKEN,
@@ -83,7 +83,6 @@ const QuickChat: React.FC = () => {
     },
   });
 
-  // Fetch messages
   const { data: selectedUserData } = useQuery({
     queryKey: ["selectedUserData", selectedUser?.id],
     enabled: !!selectedUser && status === "authenticated" && !!TOKEN,
@@ -121,13 +120,12 @@ const QuickChat: React.FC = () => {
     },
   });
 
-  // Update users list with online status
   useEffect(() => {
     if (userData?.users) {
       const mappedUsers: User[] = userData.users.map((u: any) => ({
         id: u._id,
         name: u.fullName,
-        avatar: u.profileImage || "User",
+        avatar: u.profileImage || "U",
         email: u.email,
         profileImage: u.profileImage,
         status: onlineUsers.includes(u._id) ? "Online" : "Offline",
@@ -136,12 +134,18 @@ const QuickChat: React.FC = () => {
     }
   }, [userData, onlineUsers]);
 
-  // Load messages from API
   useEffect(() => {
     if (selectedUserData?.message) {
-      setMessages(selectedUserData.message);
+      const msgs: ChatMessage[] = selectedUserData.message;
+      setMessages(msgs);
 
-      const unseenIds = selectedUserData.message
+      const images = msgs
+        .filter((msg) => msg.image)
+        .map((msg) => msg.image!)
+        .reverse();
+      setSharedMedia(images);
+
+      const unseenIds = msgs
         .filter((msg: ChatMessage) => !msg.seen && msg.receiverId === myId)
         .map((msg: ChatMessage) => msg._id!)
         .filter(Boolean);
@@ -152,11 +156,13 @@ const QuickChat: React.FC = () => {
     }
   }, [selectedUserData, myId]);
 
-  // Socket: শুধু অন্যের মেসেজ এড করো
   useSocket(
     (message: ChatMessage) => {
       if (message.senderId !== myId) {
         setMessages((prev) => [...prev, message]);
+        if (message.image) {
+          setSharedMedia((prev) => [message.image!, ...prev]);
+        }
         if (!message.seen && message._id) {
           markMessageAsSeen.mutate([message._id]);
         }
@@ -165,28 +171,32 @@ const QuickChat: React.FC = () => {
     (onlineIds) => setOnlineUsers(onlineIds)
   );
 
-  // এই ফাংশনটা শুধু ChatArea থেকে কল হবে
   const handleNewMessage = (message: ChatMessage) => {
-    // যদি temp message হয় (temp_ দিয়ে শুরু) → শুধু add করো
-    // যদি real message হয় → temp টা রিপ্লেস করো
     const isTemp = typeof message._id === "string" && message._id.startsWith("temp_");
 
     if (isTemp) {
       setMessages((prev) => [...prev, message]);
+      if (message.image) {
+        setSharedMedia((prev) => [message.image!, ...prev]);
+      }
     } else {
       setMessages((prev) =>
         prev.map((msg) =>
-          typeof msg._id === "string" && msg._id.startsWith("temp_")
-            ? message
-            : msg
+          typeof msg._id === "string" && msg._id.startsWith("temp_") ? message : msg
         )
       );
+      if (message.image) {
+        setSharedMedia((prev) => {
+          const filtered = prev.filter((url) => !url.startsWith("blob:"));
+          return [message.image!, ...filtered];
+        });
+      }
     }
   };
 
   return (
-    <div className="flex items-center justify-center h-screen w-full">
-      <div className="flex w-[60%] h-[75%] shadow-xl rounded-xl overflow-hidden border">
+    <div className="flex items-center justify-center h-screen w-full bg-gray-900">
+      <div className="flex w-[80%] max-w-7xl h-[85vh] shadow-2xl rounded-2xl overflow-hidden border border-purple-500/20">
         <Sidebar users={users} selectedUser={selectedUser} onSelectUser={setSelectedUser} />
 
         <div className="flex-1 flex">
@@ -197,12 +207,14 @@ const QuickChat: React.FC = () => {
               selectedUser={selectedUser}
               messages={messages}
               myId={myId}
-              onMessageSent={handleNewMessage}   // এইটা চেঞ্জ করা হয়েছে
+              onMessageSent={handleNewMessage}
             />
           )}
         </div>
 
-        {selectedUser && <ProfilePanel selectedUser={selectedUser} />}
+        {selectedUser && (
+          <ProfilePanel selectedUser={selectedUser} sharedMedia={sharedMedia} />
+        )}
       </div>
     </div>
   );
