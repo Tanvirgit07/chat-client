@@ -15,7 +15,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({ selectedUser }) => {
           {selectedUser.avatar}
         </div>
         <h2 className="text-white text-xl font-semibold">{selectedUser.name}</h2>
-        <p className="text-gray-400 text-sm mt-1">{selectedUser.bio}</p>
+        {/* <p className="text-gray-400 text-sm mt-1">{selectedUser.bio}</p> */}
       </div>
 
       <div className="p-6">

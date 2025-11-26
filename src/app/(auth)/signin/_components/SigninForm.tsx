@@ -96,7 +96,7 @@ export function SigninForm() {
                   <FormItem>
                     <FormLabel className="text-white">Email</FormLabel>
                     <FormControl>
-                      <Input
+                      <Input className="text-white"
                         placeholder="example@gmail.com"
                         type="email"
                         {...field}
@@ -115,7 +115,7 @@ export function SigninForm() {
                   <FormItem>
                     <FormLabel className="text-white">Password</FormLabel>
                     <FormControl>
-                      <Input
+                      <Input className="text-white"
                         placeholder="Enter your password"
                         type="password"
                         {...field}
