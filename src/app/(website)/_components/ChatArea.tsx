@@ -2,12 +2,13 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Send, Image as ImageIcon, X } from "lucide-react";
+import { Send, Image as ImageIcon, X, Smile } from "lucide-react"; // 🟢 Emoji Icon Added
 import { User, ChatMessage } from "./QuickChat";
 import Image from "next/image";
 import { useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import EmojiPicker, { Theme } from "emoji-picker-react"; // 🟢 Emoji Picker Added
 
 interface ChatAreaProps {
   selectedUser: User;
@@ -26,6 +27,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  // 🟢 Emoji Picker State
+  const [showEmoji, setShowEmoji] = useState(false);
 
   const { data: session } = useSession();
   const TOKEN = (session?.user as any)?.accessToken;
@@ -76,16 +80,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         setText("");
         setSelectedFiles([]);
       },
-      onError: () => {
-        alert("Message failed to send!");
-      },
     });
   };
 
-  // ইমেজ রিমুভ করার ফাংশন
   const removeImage = () => {
     setSelectedFiles([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // 🟢 Emoji Add Function
+  const onEmojiClick = (emojiData: any) => {
+    setText((prev) => prev + emojiData.emoji);
   };
 
   useEffect(() => {
@@ -143,7 +148,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         <div className="max-w-4xl mx-auto py-10 px-4">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center pt-20 text-center">
-             
               <h3 className="text-xl font-bold text-white mb-2">
                 No messages yet!
               </h3>
@@ -232,6 +236,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       {/* Input + Preview */}
       <div className="bg-black/40 backdrop-blur-xl border-t border-purple-500/20 p-4">
         <div className="max-w-4xl mx-auto space-y-3">
+
           {/* Image Preview */}
           {selectedFiles.length > 0 && (
             <div className="relative inline-block max-w-xs">
@@ -252,7 +257,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           )}
 
           {/* Input Bar */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative">
+
+            {/* Image Button */}
             <input
               type="file"
               ref={fileInputRef}
@@ -270,6 +277,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               <ImageIcon size={26} />
             </div>
 
+            {/* 🟢 Emoji Button */}
+            <div
+              onClick={() => setShowEmoji((prev) => !prev)}
+              className="text-gray-400 hover:text-yellow-400 cursor-pointer transition"
+            >
+              <Smile size={26} />
+            </div>
+
+            {/* 🟢 Emoji Picker */}
+            {showEmoji && (
+              <div className="absolute bottom-16 left-12 z-50">
+                <EmojiPicker onEmojiClick={onEmojiClick} theme={Theme.DARK} />
+              </div>
+            )}
+
+            {/* Text Input */}
             <input
               type="text"
               value={text}
@@ -283,6 +306,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               className="flex-1 bg-white/10 backdrop-blur-md text-white placeholder-gray-400 rounded-full py-3.5 px-6 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
             />
 
+            {/* Send Button */}
             <button
               onClick={handleSend}
               disabled={

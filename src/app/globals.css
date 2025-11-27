@@ -100,7 +100,6 @@
    =================================== */
 @layer components {
   .btn,
-  button,
   .shadcn-button,
   .btn-primary,
   .bg-primary {
@@ -118,3 +117,24 @@
   }
 }
 
+
+
+/* Remove background, shadow and border */
+.emojiPickerOverride .EmojiPickerReact {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Inner sections transparent */
+.emojiPickerOverride .EmojiPickerReact .epr-body,
+.emojiPickerOverride .EmojiPickerReact .epr-search-container,
+.emojiPickerOverride .EmojiPickerReact .epr-emoji-category-label {
+  background: transparent !important;
+}
+
+/* Hover এর সময় কাস্টম ব্যাকগ্রাউন্ড */
+.emojiPickerOverride .EmojiPickerReact .epr-emoji:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 6px !important;
+}
