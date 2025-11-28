@@ -21,6 +21,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 interface ChatAreaProps {
   selectedUser: User;
@@ -52,7 +58,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const [showEmoji, setShowEmoji] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const { data: session } = useSession();
   const TOKEN = (session?.user as any)?.accessToken;
@@ -107,7 +112,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const handleEdit = (messageId: string, currentText: string) => {
     setEditingMessageId(messageId);
     setEditText(currentText);
-    setOpenMenuId(null); // মেনু বন্ধ
   };
 
   const saveEdit = () => {
@@ -135,26 +139,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  // Three dot মেনু টগল করা
-  const toggleMenu = (e: React.MouseEvent, messageId: string) => {
-    e.stopPropagation();
-    setOpenMenuId((prev) => (prev === messageId ? null : messageId));
-  };
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  // বাইরে ক্লিক করলে মেনু বন্ধ
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest(".message-menu")) {
-        setOpenMenuId(null);
-      }
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
 
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString("en-US", {
@@ -203,12 +190,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       <ScrollArea className="flex-1">
         <div className="max-w-4xl mx-auto py-4 sm:py-10 px-3 sm:px-4">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center pt-10 sm:pt-20 text-center">
-              <h3 className="text-lg sm:text-xl font-bold text-white mb-2">No messages yet!</h3>
-              <p className="text-gray-400 text-sm">Start the conversation</p>
+            <div className="h-full flex flex-col items-center justify-center pt-20 text-center">
+              <h3 className="text-xl font-bold text-white mb-2">No messages yet!</h3>
+              <p className="text-gray-400">Start the conversation</p>
             </div>
           ) : (
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6">
               {messages.map((msg, index) => {
                 const isMine = msg.senderId === myId;
                 const prevMsg = index > 0 ? messages[index - 1] : null;
@@ -220,23 +207,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 return (
                   <div
                     key={msg._id || index}
-                    className={`flex items-end gap-2 sm:gap-3 ${isMine ? "flex-row-reverse" : "flex-row"}`}
+                    className={`flex items-end gap-3 ${isMine ? "flex-row-reverse" : "flex-row"}`}
                   >
                     {!isMine && showAvatar && (
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-sm sm:text-base font-bold shadow-xl flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-sm font-bold shadow-xl flex-shrink-0">
                         {selectedUser.profileImage ? (
                           <Image width={32} height={32} src={selectedUser.profileImage} alt="" className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-white text-xs sm:text-sm">{getInitials(selectedUser.name)}</span>
+                          <span className="text-white text-sm">{getInitials(selectedUser.name)}</span>
                         )}
                       </div>
                     )}
-                    {!isMine && !showAvatar && <div className="w-6 sm:w-8" />}
+                    {!isMine && !showAvatar && <div className="w-8" />}
 
-                    <div className="flex items-end gap-2 max-w-[85%] sm:max-w-[75%]">
-                      {/* Message Bubble */}
+                    <div className="flex items-end gap-2 max-w-[75%]">
                       <div
-                        className={`rounded-2xl px-3 sm:px-4 py-2 sm:py-3 shadow-xl transition-all ${
+                        className={`rounded-2xl px-4 py-3 shadow-xl transition-all ${
                           isMine
                             ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-tr-none"
                             : "bg-gray-700/90 text-white rounded-tl-none backdrop-blur-sm border border-white/5"
@@ -263,13 +249,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                         ) : (
                           <>
                             {msg.text && (
-                              <p className="text-sm sm:text-base leading-relaxed break-words">
+                              <p className="text-base leading-relaxed break-words">
                                 {msg.text}
                                 {msg.edited && <span className="text-xs opacity-70 ml-1">(edited)</span>}
                               </p>
                             )}
                             {msg.image && (
-                              <div className="mt-2 sm:mt-3 -mx-1 sm:-mx-2">
+                              <div className="mt-3 -mx-2">
                                 <Image
                                   width={380}
                                   height={380}
@@ -279,10 +265,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                                 />
                               </div>
                             )}
-                            <div className="flex items-center justify-between mt-1 sm:mt-2">
-                              <span className="text-[10px] sm:text-xs opacity-70">{formatTime(msg.createdAt)}</span>
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="text-xs opacity-70">{formatTime(msg.createdAt)}</span>
                               {isMine && (
-                                <span className={`text-[10px] sm:text-xs font-bold ${msg.seen ? "text-cyan-400" : "text-gray-400"}`}>
+                                <span className={`text-xs font-bold ${msg.seen ? "text-cyan-400" : "text-gray-400"}`}>
                                   {msg.seen ? "Seen" : "Sent"}
                                 </span>
                               )}
@@ -291,53 +277,48 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                         )}
                       </div>
 
-                      {/* Three Dot Menu */}
+                      {/* Three Dot Menu with shadcn Popover */}
                       {!deletedForMe && (
-                        <div className="message-menu relative">
-                          <button
-                            onClick={(e) => toggleMenu(e, msg._id!)}
-                            className="text-white/60 hover:text-white transition p-1 rounded-full hover:bg-white/10"
-                          >
-                            <MoreVertical size={18} />
-                          </button>
-
-                          {/* Menu Dropdown */}
-                          {openMenuId === msg._id && (
-                            <div
-                              className="message-menu absolute bottom-10 -right-2 bg-gray-800 border border-purple-500/30 rounded-lg shadow-2xl py-2 min-w-48 z-50"
-                              onClick={(e) => e.stopPropagation()}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-white/60 hover:text-white hover:bg-white/10 rounded-full"
                             >
+                              <MoreVertical size={18} />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-0 bg-gray-800 border border-purple-500/30" align={isMine ? "end" : "start"}>
+                            <div className="py-1">
                               {isMine && (
                                 <>
-                                  <button
+                                  <Button
+                                    variant="ghost"
+                                    className="w-full justify-start text-white hover:bg-purple-600/50"
                                     onClick={() => handleEdit(msg._id!, msg.text || "")}
-                                    className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-purple-600/50 flex items-center gap-3 transition"
                                   >
-                                    <Edit2 size={16} /> Edit Message
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      messageActions?.onDeleteForEveryone(msg._id!);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-600/30 flex items-center gap-3 transition"
+                                    <Edit2 size={16} className="mr-3" /> Edit Message
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    className="w-full justify-start text-red-400 hover:bg-red-600/30"
+                                    onClick={() => messageActions?.onDeleteForEveryone(msg._id!)}
                                   >
-                                    <Users size={16} /> Delete for Everyone
-                                  </button>
+                                    <Users size={16} className="mr-3" /> Delete for Everyone
+                                  </Button>
                                 </>
                               )}
-                              <button
-                                onClick={() => {
-                                  messageActions?.onDeleteForMe(msg._id!);
-                                  setOpenMenuId(null);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-600/30 flex items-center gap-3 transition border-t border-white/10 mt-1"
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start text-red-400 hover:bg-red-600/30 border-t border-white/10"
+                                onClick={() => messageActions?.onDeleteForMe(msg._id!)}
                               >
-                                <Trash2 size={16} /> Delete for Me
-                              </button>
+                                <Trash2 size={16} className="mr-3" /> Delete for Me
+                              </Button>
                             </div>
-                          )}
-                        </div>
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </div>
                   </div>
@@ -350,46 +331,58 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="bg-black/40 backdrop-blur-xl border-t border-purple-500/20 p-3 sm:p-4">
-        <div className="max-w-4xl mx-auto space-y-2 sm:space-y-3">
+      <div className="bg-black/40 backdrop-blur-xl border-t border-purple-500/20 p-4">
+        <div className="max-w-4xl mx-auto space-y-3">
           {selectedFiles.length > 0 && (
-            <div className="relative inline-block max-w-xs">
+            <div className="relative inline-block">
               <Image
                 width={400}
                 height={400}
                 src={URL.createObjectURL(selectedFiles[0])}
                 alt="Preview"
-                className="rounded-xl max-w-full max-h-48 sm:max-h-60 object-cover shadow-2xl border border-purple-500/30"
+                className="rounded-xl max-w-full max-h-60 object-cover shadow-2xl border border-purple-500/30"
               />
-              <button onClick={removeImage} className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 transition">
+              <button
+                onClick={removeImage}
+                className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 transition"
+              >
                 <X size={16} />
               </button>
             </div>
           )}
 
-          <div className="flex items-center gap-2 sm:gap-3 relative">
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => e.target.files && setSelectedFiles(Array.from(e.target.files))} />
-            <button onClick={() => fileInputRef.current?.click()} className="text-gray-400 hover:text-purple-400 transition flex-shrink-0">
-              <ImageIcon size={22} className="sm:w-6 sm:h-6" />
+          <div className="flex items-center gap-3 relative">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => e.target.files && setSelectedFiles(Array.from(e.target.files))}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-gray-400 hover:text-purple-400 transition"
+            >
+              <ImageIcon size={24} />
             </button>
 
-            <button onClick={() => setShowEmoji((prev) => !prev)} className="text-gray-400 hover:text-yellow-400 transition flex-shrink-0">
-              <Smile size={22} className="sm:w-6 sm:h-6" />
+            <button
+              onClick={() => setShowEmoji((prev) => !prev)}
+              className="text-gray-400 hover:text-yellow-400 transition"
+            >
+              <Smile size={24} />
             </button>
 
             {showEmoji && (
-              <div className="absolute bottom-14 sm:bottom-16 left-0 sm:left-12 z-50">
-                <EmojiPicker onEmojiClick={onEmojiClick} theme={Theme.DARK} width={280} height={350} />
+              <div className="absolute bottom-16 left-12 z-50">
+                <EmojiPicker onEmojiClick={onEmojiClick} theme={Theme.DARK} width={300} height={350} />
               </div>
             )}
 
             <input
               type="text"
               value={editingMessageId ? editText : text}
-              onChange={(e) => {
-                if (editingMessageId) setEditText(e.target.value);
-                else setText(e.target.value);
-              }}
+              onChange={(e) => (editingMessageId ? setEditText(e.target.value) : setText(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -398,15 +391,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 if (e.key === "Escape" && editingMessageId) cancelEdit();
               }}
               placeholder={editingMessageId ? "Edit message..." : "Type a message..."}
-              className="flex-1 bg-white/10 backdrop-blur-md text-white placeholder-gray-400 rounded-full py-2.5 sm:py-3.5 px-4 sm:px-6 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
+              className="flex-1 bg-white/10 backdrop-blur-md text-white placeholder-gray-400 rounded-full py-3.5 px-6 text-base focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
             />
 
             <button
               onClick={editingMessageId ? saveEdit : handleSend}
               disabled={sendMessageMutation.isPending || (!text.trim() && selectedFiles.length === 0 && !editingMessageId)}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 text-white rounded-full p-2.5 sm:p-3.5 shadow-xl transition transform hover:scale-110 active:scale-95 flex-shrink-0"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 text-white rounded-full p-3.5 shadow-xl transition transform hover:scale-110 active:scale-95"
             >
-              <Send size={20} className="sm:w-6 sm:h-6" />
+              <Send size={22} />
             </button>
           </div>
         </div>
