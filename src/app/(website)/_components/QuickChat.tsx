@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // components/chat/QuickChat.tsx
 "use client";
@@ -32,6 +33,12 @@ export interface ChatMessage {
   seen?: boolean;
   edited?: boolean;
   deletedBy?: string[];
+
+  // Reply Feature এর জন্য
+  replyTo?: string | null;
+  replyToText?: string;
+  replyToImage?: string;
+  replyToSenderName?: string;
 }
 
 const QuickChat: React.FC = () => {
@@ -190,13 +197,20 @@ const QuickChat: React.FC = () => {
   }, [selectedUserData, myId]);
 
   const handleNewMessage = (message: ChatMessage) => {
-    const isTemp = message._id?.startsWith("temp_");
-    if (isTemp) {
-      setMessages(prev => [...prev, message]);
-    } else {
-      setMessages(prev => prev.map(m => m._id?.startsWith("temp_") ? message : m));
+  const isTemp = (id: string | undefined) => id?.startsWith("temp_");
+
+  setMessages((prev) => {
+    const exists = prev.some((m) => m._id === message._id);
+    if (exists) {
+      return prev.map((m) => (m._id === message._id ? message : m));
     }
-  };
+    if (isTemp(message._id)) {
+      return [...prev, message];
+    }
+    // Replace temp message with real one
+    return prev.map((m) => (isTemp(m._id) && m.text === message.text && m.image === message.image ? message : m));
+  });
+};
 
   const messageActions = {
     onEdit: (id: string, text: string) => editMessageMutation.mutate({ messageId: id, newText: text }),
@@ -208,8 +222,8 @@ const QuickChat: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900 p-2">
-      <div className="flex w-full max-w-7xl h-[90vh] rounded-2xl overflow-hidden border border-purple-500/20 shadow-2xl">
+    <div className="flex items-center justify-center min-h-screen bg-gray-900 lg:p-2">
+      <div className="flex w-full max-w-7xl lg:h-[90vh] h-screen lg:rounded-2xl overflow-hidden border border-purple-500/20 shadow-2xl">
         <div className={`${selectedUser ? 'hidden lg:flex' : 'flex'} w-full lg:w-96`}>
           <Sidebar users={users} selectedUser={selectedUser} onSelectUser={setSelectedUser} />
         </div>

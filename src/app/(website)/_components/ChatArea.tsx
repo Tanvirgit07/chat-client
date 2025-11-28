@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// components/chat/ChatArea.tsx
+
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
@@ -9,13 +11,14 @@ import {
   X,
   Smile,
   ArrowLeft,
-  User as UserIcon,
   MoreVertical,
   Edit2,
   Trash2,
   Users,
+  Reply,
+  User,
 } from "lucide-react";
-import { User, ChatMessage } from "./QuickChat";
+import { User as UserType, ChatMessage } from "./QuickChat";
 import Image from "next/image";
 import { useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -29,7 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 interface ChatAreaProps {
-  selectedUser: User;
+  selectedUser: UserType;
   messages: ChatMessage[];
   myId: string;
   onMessageSent?: (message: ChatMessage) => void;
@@ -53,11 +56,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [text, setText] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showEmoji, setShowEmoji] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
 
   const { data: session } = useSession();
   const TOKEN = (session?.user as any)?.accessToken;
@@ -72,334 +78,482 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           headers: { Authorization: `Bearer ${TOKEN}` },
         }
       );
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) throw new Error("Failed to send");
       return res.json();
+    },
+    onSuccess: (res) => {
+      const realMessage = res?.data as ChatMessage;
+      if (realMessage?._id) onMessageSent?.(realMessage);
+      resetInput();
     },
   });
 
-  const handleSend = () => {
-    if (!text.trim() && selectedFiles.length === 0) return;
+  const resetInput = () => {
+    setText("");
+    setSelectedFiles([]);
+    setReplyingTo(null);
+    setEditingMessageId(null);
+    setEditText("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-    const tempId = `temp_${Date.now()}_${Math.random()}`;
+  const handleSend = () => {
+    if (
+      (!text.trim() && selectedFiles.length === 0) ||
+      sendMessageMutation.isPending
+    )
+      return;
+
+    const tempId = `temp_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+
     const tempMessage: ChatMessage = {
       _id: tempId,
       senderId: myId,
       receiverId: selectedUser.id,
       text: text || undefined,
-      image: selectedFiles[0] ? URL.createObjectURL(selectedFiles[0]) : undefined,
+      image: selectedFiles[0]
+        ? URL.createObjectURL(selectedFiles[0])
+        : undefined,
       createdAt: new Date().toISOString(),
       seen: false,
+      edited: false,
+      replyTo: replyingTo?._id || null,
+      replyToText: replyingTo?.text || "",
+      replyToImage: replyingTo?.image || undefined,
+      replyToSenderName:
+        replyingTo?.senderId === myId ? "You" : selectedUser.name,
     };
 
     onMessageSent?.(tempMessage);
 
     const formData = new FormData();
-    formData.append("text", text);
-    selectedFiles.forEach((file) => formData.append("image", file));
+    if (text.trim()) formData.append("text", text.trim());
+    if (selectedFiles[0]) formData.append("image", selectedFiles[0]);
 
-    sendMessageMutation.mutate(formData, {
-      onSuccess: (res) => {
-        const realMessage = res?.data as ChatMessage;
-        if (realMessage?._id) {
-          onMessageSent?.(realMessage);
-        }
-        setText("");
-        setSelectedFiles([]);
-      },
-    });
-  };
-
-  const handleEdit = (messageId: string, currentText: string) => {
-    setEditingMessageId(messageId);
-    setEditText(currentText);
-  };
-
-  const saveEdit = () => {
-    if (!editText.trim() || !editingMessageId) return;
-    messageActions?.onEdit(editingMessageId, editText);
-    setEditingMessageId(null);
-    setEditText("");
-  };
-
-  const cancelEdit = () => {
-    setEditingMessageId(null);
-    setEditText("");
-  };
-
-  const removeImage = () => {
-    setSelectedFiles([]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const onEmojiClick = (emojiData: any) => {
-    if (editingMessageId) {
-      setEditText((prev) => prev + emojiData.emoji);
-    } else {
-      setText((prev) => prev + emojiData.emoji);
+    if (replyingTo) {
+      if (replyingTo._id && !replyingTo._id.startsWith("temp_")) {
+        formData.append("replyTo", replyingTo._id);
+      }
+      formData.append("replyToText", replyingTo.text || "");
+      if (replyingTo.image) formData.append("replyToImage", replyingTo.image);
+      formData.append(
+        "replyToSenderName",
+        replyingTo.senderId === myId ? "You" : selectedUser.name
+      );
     }
+
+    sendMessageMutation.mutate(formData);
   };
+
+  const handleEdit = () => {
+    if (!editText.trim() || !editingMessageId) return;
+    messageActions?.onEdit(editingMessageId, editText.trim());
+    resetInput();
+  };
+
+  const startEdit = (msg: ChatMessage) => {
+    setEditingMessageId(msg._id!);
+    setEditText(msg.text || "");
+    setReplyingTo(null);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const formatTime = (date: string) =>
+    new Date(date).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .map((n) => n[0]?.toUpperCase())
+      .join("")
+      .slice(0, 2);
+
+  const isDeletedForMe = (msg: ChatMessage) => msg.deletedBy?.includes(myId);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
-
-  const getInitials = (name: string) => {
-    return name.split(" ").map((n) => n[0]?.toUpperCase()).slice(0, 2).join("");
-  };
-
-  const isDeletedForMe = (msg: ChatMessage) => msg.deletedBy?.includes(myId);
-
   return (
-    <div className="flex-1 flex flex-col bg-gray-900/30 h-full relative">
+    <div className="flex-1 flex flex-col bg-gray-900/30 h-full">
       {/* Header */}
       <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 p-3 sm:p-4">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <button onClick={onBack} className="lg:hidden text-white hover:text-purple-400 transition">
+        <div className="flex items-center gap-3 sm:p-4">
+          <button onClick={onBack} className="lg:hidden text-white">
             <ArrowLeft size={24} />
           </button>
-
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center font-bold text-lg sm:text-xl shadow-xl flex-shrink-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center font-bold text-lg shadow-xl">
             {selectedUser.profileImage ? (
-              <Image width={48} height={48} src={selectedUser.profileImage} alt={selectedUser.name} className="w-full h-full object-cover" />
+              <Image
+                width={48}
+                height={48}
+                src={selectedUser.profileImage}
+                alt=""
+                className="w-full h-full object-cover"
+              />
             ) : (
-              <span className="text-white">{getInitials(selectedUser.name)}</span>
+              <span className="text-white">
+                {getInitials(selectedUser.name)}
+              </span>
             )}
           </div>
-
           <div className="flex-1 min-w-0">
-            <h3 className="text-white font-bold text-base sm:text-lg truncate">{selectedUser.name}</h3>
-            <p className="text-green-400 text-xs sm:text-sm font-medium">
-              {selectedUser.status === "Online" ? "Online" : "Offline"}
+            <h3 className="text-white font-bold text-base sm:text-lg truncate">
+              {selectedUser.name}
+            </h3>
+            <p className="text-green-400 text-xs sm:text-sm">
+              {selectedUser.status === "Online"
+                ? "Online"
+                : "Last seen recently"}
             </p>
           </div>
-
-          <button onClick={onProfileClick} className="xl:hidden text-white hover:text-purple-400 transition">
-            <UserIcon size={24} />
+          <button onClick={onProfileClick} className="text-white">
+            <User size={24} />
           </button>
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Reply Preview - WhatsApp Style */}
+      {replyingTo && (
+        <div className="bg-gray-800/95 border-l-4 border-purple-500 px-4 py-3 flex items-center justify-between animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Reply
+              size={18}
+              className="text-purple-400 flex-shrink-0 rotate-180"
+            />
+            <div className="min-w-0">
+              <p className="text-purple-400 font-medium text-sm truncate">
+                Replying to{" "}
+                {replyingTo.senderId === myId ? "yourself" : selectedUser.name}
+              </p>
+              <p className="text-gray-300 text-xs truncate mt-0.5">
+                {replyingTo.image ? "Photo" : replyingTo.text || "Message"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setReplyingTo(null)}
+            className="text-gray-400 hover:text-white ml-3 p-1 hover:bg-white/10 rounded-full transition"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Messages Area */}
       <ScrollArea className="flex-1">
-        <div className="max-w-4xl mx-auto py-4 sm:py-10 px-3 sm:px-4">
+        <div className="max-w-4xl mx-auto py-6 px-4 space-y-4">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center pt-20 text-center">
-              <h3 className="text-xl font-bold text-white mb-2">No messages yet!</h3>
-              <p className="text-gray-400">Start the conversation</p>
+            <div className="text-center text-gray-400 pt-32">
+              <h3 className="text-2xl font-bold text-white mb-2">
+                No messages yet!
+              </h3>
+              <p>Start the conversation</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {messages.map((msg, index) => {
-                const isMine = msg.senderId === myId;
-                const prevMsg = index > 0 ? messages[index - 1] : null;
-                const showAvatar = !isMine && (!prevMsg || prevMsg.senderId !== msg.senderId);
-                const deletedForMe = isDeletedForMe(msg);
+            messages.map((msg) => {
+              const isMine = msg.senderId === myId;
+              const deleted = isDeletedForMe(msg);
+              const isTemp = msg._id?.startsWith("temp_");
 
-                if (msg._id === "being-deleted") return null;
+              return (
+                <div
+                  key={msg._id || Math.random()}
+                  className={`flex items-end gap-3 group ${
+                    isMine ? "flex-row-reverse" : "flex-row"
+                  }`}
+                  // Long Press for Reply (Mobile)
+                  onTouchStart={() => {
+                    if (deleted || isTemp) return;
 
-                return (
-                  <div
-                    key={msg._id || index}
-                    className={`flex items-end gap-3 ${isMine ? "flex-row-reverse" : "flex-row"}`}
-                  >
-                    {!isMine && showAvatar && (
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-sm font-bold shadow-xl flex-shrink-0">
-                        {selectedUser.profileImage ? (
-                          <Image width={32} height={32} src={selectedUser.profileImage} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-white text-sm">{getInitials(selectedUser.name)}</span>
-                        )}
-                      </div>
-                    )}
-                    {!isMine && !showAvatar && <div className="w-8" />}
+                    const timeout = setTimeout(() => setReplyingTo(msg), 600);
 
-                    <div className="flex items-end gap-2 max-w-[75%]">
-                      <div
-                        className={`rounded-2xl px-4 py-3 shadow-xl transition-all ${
-                          isMine
-                            ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-tr-none"
-                            : "bg-gray-700/90 text-white rounded-tl-none backdrop-blur-sm border border-white/5"
-                        } ${deletedForMe ? "opacity-50" : ""}`}
-                      >
-                        {editingMessageId === msg._id ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={editText}
-                              onChange={(e) => setEditText(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") saveEdit();
-                                if (e.key === "Escape") cancelEdit();
-                              }}
-                              className="flex-1 bg-white/20 rounded px-3 py-1.5 text-white placeholder-gray-300 text-sm"
-                              autoFocus
-                            />
-                            <button onClick={saveEdit} className="text-green-400"><Send size={18} /></button>
-                            <button onClick={cancelEdit} className="text-red-400"><X size={18} /></button>
+                    const handleCancel = () => {
+                      clearTimeout(timeout);
+                      document.removeEventListener("touchend", handleCancel);
+                      document.removeEventListener("touchmove", handleCancel);
+                    };
+
+                    document.addEventListener("touchend", handleCancel);
+                    document.addEventListener("touchmove", handleCancel, {
+                      passive: true,
+                    });
+                  }}
+                  // Click for Reply (Desktop)
+                  onClick={(e) => {
+                    if (e.detail === 1 && !deleted && !isTemp) {
+                      // Single click does nothing
+                    }
+                  }}
+                >
+                  <div className={`max-w-[75%] ${deleted ? "opacity-50" : ""}`}>
+                    {/* Quoted Message */}
+                    {msg.replyTo && !deleted && (
+                      <div className="mb-3">
+                        <div className="bg-gray-800/80 rounded-xl overflow-hidden border border-purple-500/30 shadow-md">
+                          <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1.5">
+                            <p className="text-xs font-bold text-white truncate">
+                              {msg.replyToSenderName ||
+                                (isMine ? "You" : selectedUser.name)}
+                            </p>
                           </div>
-                        ) : deletedForMe ? (
-                          <p className="text-gray-500 italic text-sm">This message was deleted</p>
-                        ) : (
-                          <>
-                            {msg.text && (
-                              <p className="text-base leading-relaxed break-words">
-                                {msg.text}
-                                {msg.edited && <span className="text-xs opacity-70 ml-1">(edited)</span>}
+                          <div className="p-3 bg-gray-900/50">
+                            {msg.replyToImage ? (
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-700">
+                                  <Image
+                                    src={msg.replyToImage}
+                                    width={48}
+                                    height={48}
+                                    alt="replied"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <span className="text-sm text-gray-400">
+                                  Photo
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-300 line-clamp-2 break-all">
+                                {msg.replyToText || "Message"}
                               </p>
                             )}
-                            {msg.image && (
-                              <div className="mt-3 -mx-2">
-                                <Image
-                                  width={380}
-                                  height={380}
-                                  src={msg.image}
-                                  alt="sent"
-                                  className="rounded-xl max-w-full shadow-lg border border-white/10"
-                                />
-                              </div>
-                            )}
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs opacity-70">{formatTime(msg.createdAt)}</span>
-                              {isMine && (
-                                <span className={`text-xs font-bold ${msg.seen ? "text-cyan-400" : "text-gray-400"}`}>
-                                  {msg.seen ? "Seen" : "Sent"}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Message Bubble */}
+                    <div
+                      className={`relative rounded-2xl px-4 py-3 shadow-xl transition-all ${
+                        isMine
+                          ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-tr-none"
+                          : "bg-gray-700/90 text-white rounded-tl-none"
+                      }`}
+                    >
+                      {deleted ? (
+                        <p className="italic text-gray-400 text-sm">
+                          This message was deleted
+                        </p>
+                      ) : (
+                        <>
+                          {msg.text && (
+                            <p className="break-words text-base leading-relaxed">
+                              {editingMessageId === msg._id ? (
+                                <span className="opacity-80">{editText}</span>
+                              ) : (
+                                msg.text
+                              )}
+                              {msg.edited && (
+                                <span className="text-xs opacity-70 ml-1">
+                                  (edited)
                                 </span>
                               )}
+                            </p>
+                          )}
+                          {msg.image && (
+                            <div className="mt-3 -mx-2">
+                              <Image
+                                src={msg.image}
+                                width={380}
+                                height={380}
+                                alt="sent"
+                                className="rounded-xl max-w-full border border-white/10 shadow-lg"
+                              />
                             </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Three Dot Menu with shadcn Popover */}
-                      {!deletedForMe && (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-white/60 hover:text-white hover:bg-white/10 rounded-full"
-                            >
-                              <MoreVertical size={18} />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-0 bg-gray-800 border border-purple-500/30" align={isMine ? "end" : "start"}>
-                            <div className="py-1">
-                              {isMine && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    className="w-full justify-start text-white hover:bg-purple-600/50"
-                                    onClick={() => handleEdit(msg._id!, msg.text || "")}
-                                  >
-                                    <Edit2 size={16} className="mr-3" /> Edit Message
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    className="w-full justify-start text-red-400 hover:bg-red-600/30"
-                                    onClick={() => messageActions?.onDeleteForEveryone(msg._id!)}
-                                  >
-                                    <Users size={16} className="mr-3" /> Delete for Everyone
-                                  </Button>
-                                </>
-                              )}
-                              <Button
-                                variant="ghost"
-                                className="w-full justify-start text-red-400 hover:bg-red-600/30 border-t border-white/10"
-                                onClick={() => messageActions?.onDeleteForMe(msg._id!)}
+                          )}
+                          <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                            <span>{formatTime(msg.createdAt)}</span>
+                            {isMine && (
+                              <span
+                                className={
+                                  msg.seen ? "text-cyan-400" : "text-gray-400"
+                                }
                               >
-                                <Trash2 size={16} className="mr-3" /> Delete for Me
-                              </Button>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                                {msg.seen ? "Seen" : "Sent"}
+                              </span>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
+
+                  {/* More Options Menu */}
+                  {!deleted && !isTemp && (
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 mb-8">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-white/60 hover:text-white hover:bg-white/10 rounded-full shadow-lg"
+                          >
+                            <MoreVertical size={18} />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-56 p-2 bg-gray-800 border border-purple-500/30 rounded-xl shadow-2xl"
+                          align={isMine ? "end" : "start"}
+                          sideOffset={10}
+                        >
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-white hover:bg-purple-600/50 rounded-lg"
+                            onClick={() => setReplyingTo(msg)}
+                          >
+                            <Reply size={16} className="mr-3" /> Reply
+                          </Button>
+                          {isMine && msg.text && (
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-white hover:bg-purple-600/50 rounded-lg"
+                              onClick={() => startEdit(msg)}
+                            >
+                              <Edit2 size={16} className="mr-3" /> Edit
+                            </Button>
+                          )}
+                          {isMine && (
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-red-400 hover:bg-red-600/30 rounded-lg"
+                              onClick={() =>
+                                messageActions?.onDeleteForEveryone(msg._id!)
+                              }
+                            >
+                              <Users size={16} className="mr-3" /> Delete for
+                              Everyone
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-red-400 hover:bg-red-600/30 rounded-lg border-t border-white/10 mt-1 pt-2"
+                            onClick={() =>
+                              messageActions?.onDeleteForMe(msg._id!)
+                            }
+                          >
+                            <Trash2 size={16} className="mr-3" /> Delete for Me
+                          </Button>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="bg-black/40 backdrop-blur-xl border-t border-purple-500/20 p-4">
-        <div className="max-w-4xl mx-auto space-y-3">
+      <div className="bg-black/50 backdrop-blur-xl border-t border-purple-500/20 p-4">
+        <div className="max-w-4xl mx-auto space-y-4">
           {selectedFiles.length > 0 && (
-            <div className="relative inline-block">
+            <div className="relative inline-block animate-in fade-in duration-300">
               <Image
+                src={URL.createObjectURL(selectedFiles[0])}
                 width={400}
                 height={400}
-                src={URL.createObjectURL(selectedFiles[0])}
-                alt="Preview"
-                className="rounded-xl max-w-full max-h-60 object-cover shadow-2xl border border-purple-500/30"
+                alt="preview"
+                className="rounded-xl max-h-64 object-cover border border-purple-500/50 shadow-2xl"
               />
               <button
-                onClick={removeImage}
-                className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 transition"
+                onClick={() => {
+                  setSelectedFiles([]);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="absolute top-2 right-2 bg-black/80 p-2 rounded-full hover:bg-black transition"
               >
-                <X size={16} />
+                <X size={16} className="text-white" />
               </button>
             </div>
           )}
 
-          <div className="flex items-center gap-3 relative">
+          <div className="flex items-end gap-3">
             <input
               type="file"
               ref={fileInputRef}
               className="hidden"
               accept="image/*"
-              onChange={(e) => e.target.files && setSelectedFiles(Array.from(e.target.files))}
+              onChange={(e) =>
+                e.target.files?.[0] && setSelectedFiles([e.target.files[0]])
+              }
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="text-gray-400 hover:text-purple-400 transition"
+              className="text-gray-400 hover:text-purple-400 transition mb-1"
             >
               <ImageIcon size={24} />
             </button>
 
             <button
-              onClick={() => setShowEmoji((prev) => !prev)}
-              className="text-gray-400 hover:text-yellow-400 transition"
+              onClick={() => setShowEmoji((p) => !p)}
+              className="text-gray-400 hover:text-yellow-400 transition mb-1"
             >
               <Smile size={24} />
             </button>
 
             {showEmoji && (
-              <div className="absolute bottom-16 left-12 z-50">
-                <EmojiPicker onEmojiClick={onEmojiClick} theme={Theme.DARK} width={300} height={350} />
+              <div className="absolute bottom-20 left-4 z-50">
+                <EmojiPicker
+                  onEmojiClick={(e) => {
+                    const emoji = e.emoji;
+                    if (editingMessageId) {
+                      setEditText((t) => t + emoji);
+                    } else {
+                      setText((t) => t + emoji);
+                    }
+                    inputRef.current?.focus();
+                  }}
+                  theme={Theme.DARK}
+                  lazyLoadEmojis={true}
+                />
               </div>
             )}
 
             <input
+              ref={inputRef}
               type="text"
               value={editingMessageId ? editText : text}
-              onChange={(e) => (editingMessageId ? setEditText(e.target.value) : setText(e.target.value))}
+              onChange={(e) =>
+                editingMessageId
+                  ? setEditText(e.target.value)
+                  : setText(e.target.value)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  editingMessageId ? saveEdit() : handleSend();
+                  editingMessageId ? handleEdit() : handleSend();
                 }
-                if (e.key === "Escape" && editingMessageId) cancelEdit();
+                if (e.key === "Escape") resetInput();
               }}
-              placeholder={editingMessageId ? "Edit message..." : "Type a message..."}
-              className="flex-1 bg-white/10 backdrop-blur-md text-white placeholder-gray-400 rounded-full py-3.5 px-6 text-base focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
+              placeholder={
+                editingMessageId
+                  ? "Edit message..."
+                  : replyingTo
+                  ? "Write a reply..."
+                  : "Type a message..."
+              }
+              className="flex-1 bg-white/10 rounded-full py-3.5 px-6 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
             />
 
             <button
-              onClick={editingMessageId ? saveEdit : handleSend}
-              disabled={sendMessageMutation.isPending || (!text.trim() && selectedFiles.length === 0 && !editingMessageId)}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 text-white rounded-full p-3.5 shadow-xl transition transform hover:scale-110 active:scale-95"
+              onClick={editingMessageId ? handleEdit : handleSend}
+              disabled={
+                sendMessageMutation.isPending ||
+                (!text.trim() &&
+                  selectedFiles.length === 0 &&
+                  !editingMessageId)
+              }
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 rounded-full p-3.5 shadow-xl transition transform hover:scale-110 active:scale-95 mb-1"
             >
-              <Send size={22} />
+              {editingMessageId ? <Edit2 size={22} /> : <Send size={22} />}
             </button>
           </div>
         </div>
