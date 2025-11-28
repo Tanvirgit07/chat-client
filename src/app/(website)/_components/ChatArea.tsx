@@ -24,11 +24,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import EmojiPicker, { Theme } from "emoji-picker-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 
 interface ChatAreaProps {
@@ -98,32 +94,23 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleSend = () => {
-    if (
-      (!text.trim() && selectedFiles.length === 0) ||
-      sendMessageMutation.isPending
-    )
-      return;
+    if ((!text.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending) return;
 
-    const tempId = `temp_${Date.now()}_${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const tempMessage: ChatMessage = {
       _id: tempId,
       senderId: myId,
       receiverId: selectedUser.id,
       text: text || undefined,
-      image: selectedFiles[0]
-        ? URL.createObjectURL(selectedFiles[0])
-        : undefined,
+      image: selectedFiles[0] ? URL.createObjectURL(selectedFiles[0]) : undefined,
       createdAt: new Date().toISOString(),
       seen: false,
       edited: false,
       replyTo: replyingTo?._id || null,
       replyToText: replyingTo?.text || "",
       replyToImage: replyingTo?.image || undefined,
-      replyToSenderName:
-        replyingTo?.senderId === myId ? "You" : selectedUser.name,
+      replyToSenderName: replyingTo?.senderId === myId ? "You" : selectedUser.name,
     };
 
     onMessageSent?.(tempMessage);
@@ -138,10 +125,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       }
       formData.append("replyToText", replyingTo.text || "");
       if (replyingTo.image) formData.append("replyToImage", replyingTo.image);
-      formData.append(
-        "replyToSenderName",
-        replyingTo.senderId === myId ? "You" : selectedUser.name
-      );
+      formData.append("replyToSenderName", replyingTo.senderId === myId ? "You" : selectedUser.name);
     }
 
     sendMessageMutation.mutate(formData);
@@ -161,17 +145,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const formatTime = (date: string) =>
-    new Date(date).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    new Date(date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
   const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .map((n) => n[0]?.toUpperCase())
-      .join("")
-      .slice(0, 2);
+    name.split(" ").map((n) => n[0]?.toUpperCase()).join("").slice(0, 2);
 
   const isDeletedForMe = (msg: ChatMessage) => msg.deletedBy?.includes(myId);
 
@@ -180,80 +157,41 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, [messages]);
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-900/30 h-full">
+    <div className="flex flex-col h-full bg-gray-900/30">
       {/* Header */}
-      <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 pr-6 pl-4 py-3 lg:pr-0 lg:pl-0 lg:py-0 border">
-        <div className="flex items-center gap-4 sm:p-4">
-          <button onClick={onBack} className="lg:hidden text-white">
-            <ArrowLeft size={24} />
-          </button>
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center font-bold text-lg shadow-xl">
-            {selectedUser.profileImage ? (
-              <Image
-                width={48}
-                height={48}
-                src={selectedUser.profileImage}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span className="text-white">
-                {getInitials(selectedUser.name)}
-              </span>
-            )}
+      <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 z-10">
+        <div className="flex items-center justify-between px-3 py-3 sm:px-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <button onClick={onBack} className="lg:hidden text-white flex-shrink-0">
+              <ArrowLeft size={26} />
+            </button>
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex-shrink-0">
+              {selectedUser.profileImage ? (
+                <Image width={40} height={40} src={selectedUser.profileImage} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white font-bold text-lg flex items-center justify-center w-full h-full">
+                  {getInitials(selectedUser.name)}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-white font-medium text-base truncate">{selectedUser.name}</h3>
+              <p className="text-green-400 text-xs">{selectedUser.status === "Online" ? "Online" : "Last seen recently"}</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-white font-bold text-base sm:text-lg truncate">
-              {selectedUser.name}
-            </h3>
-            <p className="text-green-400 text-xs sm:text-sm">
-              {selectedUser.status === "Online"
-                ? "Online"
-                : "Last seen recently"}
-            </p>
-          </div>
-          <button onClick={onProfileClick} className="text-white">
-            <User size={24} />
+          <button onClick={onProfileClick} className="text-white ml-2">
+            <User size={26} />
           </button>
         </div>
       </div>
 
-      {/* Reply Preview - WhatsApp Style */}
-      {replyingTo && (
-        <div className="bg-gray-800/95 border-l-4 border-purple-500 px-4 py-3 flex items-center justify-between animate-in slide-in-from-top-2 duration-300">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Reply
-              size={18}
-              className="text-purple-400 flex-shrink-0 rotate-180"
-            />
-            <div className="min-w-0">
-              <p className="text-purple-400 font-medium text-sm truncate">
-                Replying to{" "}
-                {replyingTo.senderId === myId ? "yourself" : selectedUser.name}
-              </p>
-              <p className="text-gray-300 text-xs truncate mt-0.5">
-                {replyingTo.image ? "Photo" : replyingTo.text || "Message"}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setReplyingTo(null)}
-            className="text-gray-400 hover:text-white ml-3 p-1 hover:bg-white/10 rounded-full transition"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      )}
-
-      {/* Messages Area */}
+      {/* Messages */}
       <ScrollArea className="flex-1">
-        <div className="max-w-4xl mx-auto py-6 px-6 space-y-4">
+        <div className="px-3 py-4 space-y-3 max-w-4xl mx-auto w-full">
           {messages.length === 0 ? (
-            <div className="text-center text-gray-400 pt-32">
-              <h3 className="text-2xl font-bold text-white mb-2">
-                No messages yet!
-              </h3>
-              <p>Start the conversation</p>
+            <div className="text-center pt-32">
+              <h3 className="text-2xl font-bold text-white mb-2">No messages yet!</h3>
+              <p className="text-gray-400">Start the conversation</p>
             </div>
           ) : (
             messages.map((msg) => {
@@ -264,180 +202,105 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               return (
                 <div
                   key={msg._id || Math.random()}
-                  className={`flex items-end gap-3 group ${
-                    isMine ? "flex-row-reverse" : "flex-row"
-                  }`}
-                  // Long Press for Reply (Mobile)
+                  className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : "flex-row"} group`}
                   onTouchStart={() => {
                     if (deleted || isTemp) return;
-
                     const timeout = setTimeout(() => setReplyingTo(msg), 600);
-
-                    const handleCancel = () => {
+                    const cancel = () => {
                       clearTimeout(timeout);
-                      document.removeEventListener("touchend", handleCancel);
-                      document.removeEventListener("touchmove", handleCancel);
+                      document.removeEventListener("touchend", cancel);
+                      document.removeEventListener("touchmove", cancel);
                     };
-
-                    document.addEventListener("touchend", handleCancel);
-                    document.addEventListener("touchmove", handleCancel, {
-                      passive: true,
-                    });
-                  }}
-                  // Click for Reply (Desktop)
-                  onClick={(e) => {
-                    if (e.detail === 1 && !deleted && !isTemp) {
-                      // Single click does nothing
-                    }
+                    document.addEventListener("touchend", cancel);
+                    document.addEventListener("touchmove", cancel, { passive: true });
                   }}
                 >
-                  <div className={`max-w-[75%] ${deleted ? "opacity-50" : ""}`}>
-                    {/* Quoted Message */}
+                  <div className={`max-w-[80%] sm:max-w-[70%] ${deleted ? "opacity-50" : ""}`}>
                     {msg.replyTo && !deleted && (
-                      <div className="mb-3">
-                        <div className="bg-gray-800/80 rounded-xl overflow-hidden border border-purple-500/30 shadow-md">
-                          <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1.5">
+                      <div className="mb-2">
+                        <div className="bg-gray-800/90 rounded-lg overflow-hidden border border-purple-500/30">
+                          <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1">
                             <p className="text-xs font-bold text-white truncate">
-                              {msg.replyToSenderName ||
-                                (isMine ? "You" : selectedUser.name)}
+                              {msg.replyToSenderName || (isMine ? "You" : selectedUser.name)}
                             </p>
                           </div>
-                          <div className="p-3 bg-gray-900/50">
+                          <div className="p-2 bg-gray-900/70">
                             {msg.replyToImage ? (
-                              <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-700">
-                                  <Image
-                                    src={msg.replyToImage}
-                                    width={48}
-                                    height={48}
-                                    alt="replied"
-                                    className="w-full h-full object-cover"
-                                  />
+                              <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded overflow-hidden bg-gray-700">
+                                  <Image src={msg.replyToImage} width={40} height={40} alt="" className="w-full h-full object-cover" />
                                 </div>
-                                <span className="text-sm text-gray-400">
-                                  Photo
-                                </span>
+                                <span className="text-xs text-gray-400">Photo</span>
                               </div>
                             ) : (
-                              <p className="text-sm text-gray-300 line-clamp-2 break-all">
-                                {msg.replyToText || "Message"}
-                              </p>
+                              <p className="text-xs text-gray-300 line-clamp-2">{msg.replyToText || "Message"}</p>
                             )}
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Message Bubble */}
                     <div
-                      className={`relative rounded-2xl px-4 py-3 shadow-xl transition-all ${
+                      className={`rounded-2xl px-3 py-2 shadow-lg ${
                         isMine
                           ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-tr-none"
                           : "bg-gray-700/90 text-white rounded-tl-none"
                       }`}
                     >
                       {deleted ? (
-                        <p className="italic text-gray-400 text-sm">
-                          This message was deleted
-                        </p>
+                        <p className="italic text-gray-400 text-sm">This message was deleted</p>
                       ) : (
                         <>
                           {msg.text && (
-                            <p className="break-words text-base leading-relaxed">
-                              {editingMessageId === msg._id ? (
-                                <span className="opacity-80">{editText}</span>
-                              ) : (
-                                msg.text
-                              )}
-                              {msg.edited && (
-                                <span className="text-xs opacity-70 ml-1">
-                                  (edited)
-                                </span>
-                              )}
+                            <p className="text-sm sm:text-base leading-relaxed break-words">
+                              {editingMessageId === msg._id ? editText : msg.text}
+                              {msg.edited && <span className="text-xs opacity-70 ml-1">(edited)</span>}
                             </p>
                           )}
                           {msg.image && (
-                            <div className="mt-3 -mx-2">
+                            <div className="mt-2 -mx-1">
                               <Image
                                 src={msg.image}
-                                width={380}
-                                height={380}
+                                width={300}
+                                height={300}
                                 alt="sent"
-                                className="rounded-xl max-w-full border border-white/10 shadow-lg"
+                                className="rounded-lg max-w-full border border-white/10"
                               />
                             </div>
                           )}
-                          <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                          <div className="flex items-center justify-between mt-1 text-xs opacity-70">
                             <span>{formatTime(msg.createdAt)}</span>
-                            {isMine && (
-                              <span
-                                className={
-                                  msg.seen ? "text-cyan-400" : "text-gray-400"
-                                }
-                              >
-                                {msg.seen ? "Seen" : "Sent"}
-                              </span>
-                            )}
+                            {isMine && <span className={msg.seen ? "text-cyan-400" : "text-gray-400"}>{msg.seen ? "Seen" : "Sent"}</span>}
                           </div>
                         </>
                       )}
                     </div>
                   </div>
 
-                  {/* More Options Menu */}
                   {!deleted && !isTemp && (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 mb-8">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-6">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-white/60 hover:text-white hover:bg-white/10 rounded-full shadow-lg"
-                          >
-                            <MoreVertical size={18} />
+                          <Button variant="ghost" size="icon" className="text-white/60 hover:text-white hover:bg-white/10 rounded-full h-8 w-8">
+                            <MoreVertical size={16} />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent
-                          className="w-56 p-2 bg-gray-800 border border-purple-500/30 rounded-xl shadow-2xl"
-                          align={isMine ? "end" : "start"}
-                          sideOffset={10}
-                        >
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start text-white hover:bg-purple-600/50 rounded-lg"
-                            onClick={() => setReplyingTo(msg)}
-                          >
-                            <Reply size={16} className="mr-3" /> Reply
+                        <PopoverContent className="w-48 p-1 bg-gray-800 border border-purple-500/30 text-sm" align={isMine ? "end" : "start"}>
+                          <Button variant="ghost" className="w-full justify-start" onClick={() => setReplyingTo(msg)}>
+                            <Reply size={14} className="mr-2" /> Reply
                           </Button>
                           {isMine && msg.text && (
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start text-white hover:bg-purple-600/50 rounded-lg"
-                              onClick={() => startEdit(msg)}
-                            >
-                              <Edit2 size={16} className="mr-3" /> Edit
+                            <Button variant="ghost" className="w-full justify-start" onClick={() => startEdit(msg)}>
+                              <Edit2 size={14} className="mr-2" /> Edit
                             </Button>
                           )}
                           {isMine && (
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start text-red-400 hover:bg-red-600/30 rounded-lg"
-                              onClick={() =>
-                                messageActions?.onDeleteForEveryone(msg._id!)
-                              }
-                            >
-                              <Users size={16} className="mr-3" /> Delete for
-                              Everyone
+                            <Button variant="ghost" className="w-full justify-start text-red-400" onClick={() => messageActions?.onDeleteForEveryone(msg._id!)}>
+                              <Users size={14} className="mr-2" /> Delete for Everyone
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start text-red-400 hover:bg-red-600/30 rounded-lg border-t border-white/10 mt-1 pt-2"
-                            onClick={() =>
-                              messageActions?.onDeleteForMe(msg._id!)
-                            }
-                          >
-                            <Trash2 size={16} className="mr-3" /> Delete for Me
+                          <Button variant="ghost" className="w-full justify-start text-red-400 border-t border-white/10" onClick={() => messageActions?.onDeleteForMe(msg._id!)}>
+                            <Trash2 size={14} className="mr-2" /> Delete for Me
                           </Button>
                         </PopoverContent>
                       </Popover>
@@ -451,111 +314,163 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </ScrollArea>
 
-      {/* Input Area */}
-      <div className="bg-black/50 backdrop-blur-xl border-t border-purple-500/20 p-4">
-        <div className="max-w-4xl mx-auto space-y-4">
+      {/* Input Area - 100% Responsive */}
+      <div className="bg-black/50 backdrop-blur-xl border-t border-purple-500/20 p-3 pb-safe-offset-4">
+        <div className="max-w-4xl mx-auto space-y-3">
+
+          {/* Reply Preview */}
+          {replyingTo && (
+            <div className="bg-gray-800/95 border-l-4 border-purple-500 rounded-r-lg px-4 py-2.5 flex items-center justify-between text-sm">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Reply size={16} className="text-purple-400 flex-shrink-0 rotate-180" />
+                <div className="min-w-0">
+                  <p className="text-purple-400 font-medium truncate">
+                    Replying to {replyingTo.senderId === myId ? "yourself" : selectedUser.name}
+                  </p>
+                  <p className="text-gray-300 text-xs truncate">{replyingTo.image ? "Photo" : replyingTo.text || "Message"}</p>
+                </div>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="text-gray-400 hover:text-white">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Image Preview */}
           {selectedFiles.length > 0 && (
-            <div className="relative inline-block animate-in fade-in duration-300">
+            <div className="relative inline-block">
               <Image
                 src={URL.createObjectURL(selectedFiles[0])}
                 width={400}
                 height={400}
-                alt="preview"
-                className="rounded-xl max-h-64 object-cover border border-purple-500/50 shadow-2xl"
+                alt="Preview"
+                className="rounded-lg max-h-64 w-auto object-cover border border-purple-500/50"
               />
               <button
                 onClick={() => {
                   setSelectedFiles([]);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
-                className="absolute top-2 right-2 bg-black/80 p-2 rounded-full hover:bg-black transition"
+                className="absolute top-2 right-2 bg-black/80 p-2 rounded-full"
               >
                 <X size={16} className="text-white" />
               </button>
             </div>
           )}
 
-          <div className="flex justify-between items-center lg:gap-4 md:gap-3 gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/*"
-              onChange={(e) =>
-                e.target.files?.[0] && setSelectedFiles([e.target.files[0]])
-              }
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="text-gray-400 hover:text-purple-400 transition mb-1"
-            >
-              <ImageIcon size={24} />
-            </button>
+         {/* Input Row - 100% Responsive + Perfect Alignment */}
+<div className="flex items-center gap-3">
+  {/* Hidden File Input */}
+  <input
+    type="file"
+    ref={fileInputRef}
+    className="hidden"
+    accept="image/*"
+    onChange={(e) => e.target.files?.[0] && setSelectedFiles([e.target.files[0]])}
+  />
 
-            <button
-              onClick={() => setShowEmoji((p) => !p)}
-              className="text-gray-400 hover:text-yellow-400 transition mb-1"
-            >
-              <Smile size={24} />
-            </button>
+  {/* Attach Image */}
+  <button
+    onClick={() => fileInputRef.current?.click()}
+    className="text-gray-400 hover:text-purple-400 transition-colors flex-shrink-0 mb-0.5"
+    aria-label="Attach image"
+  >
+    <ImageIcon size={24} />
+  </button>
 
-            {showEmoji && (
-              <div className="absolute bottom-20 left-4 z-50">
-                <EmojiPicker
-                  onEmojiClick={(e) => {
-                    const emoji = e.emoji;
-                    if (editingMessageId) {
-                      setEditText((t) => t + emoji);
-                    } else {
-                      setText((t) => t + emoji);
-                    }
-                    inputRef.current?.focus();
-                  }}
-                  theme={Theme.DARK}
-                  lazyLoadEmojis={true}
-                />
-              </div>
-            )}
+  {/* Emoji Button + Picker */}
+  <div className="relative flex-shrink-0">
+    <button
+      onClick={() => setShowEmoji(p => !p)}
+      className="text-gray-400 hover:text-yellow-400 transition-colors mb-0.5"
+      aria-label="Emoji"
+    >
+      <Smile size={24} />
+    </button>
 
-            <input
-              ref={inputRef}
-              type="text"
-              value={editingMessageId ? editText : text}
-              onChange={(e) =>
-                editingMessageId
-                  ? setEditText(e.target.value)
-                  : setText(e.target.value)
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  editingMessageId ? handleEdit() : handleSend();
-                }
-                if (e.key === "Escape") resetInput();
-              }}
-              placeholder={
-                editingMessageId
-                  ? "Edit message..."
-                  : replyingTo
-                  ? "Write a reply..."
-                  : "Type a message..."
-              }
-              className="flex-1 bg-white/10 rounded-full py-3.5 px-6 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
-            />
+    {/* Emoji Picker - Mobile Friendly */}
+    {showEmoji && (
+      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 sm:left-auto sm:translate-x-0 sm:bottom-14">
+        <div className="relative">
+          <EmojiPicker
+            onEmojiClick={(e) => {
+              const emoji = e.emoji;
+              if (editingMessageId) setEditText(t => t + emoji);
+              else setText(t => t + emoji);
+              inputRef.current?.focus();
+            }}
+            theme={Theme.DARK}
+            height={360}
+            width={320}
+            lazyLoadEmojis={true}
+          />
+          {/* Close button for mobile */}
+          <button
+            onClick={() => setShowEmoji(false)}
+            className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black/95 text-white px-4 py-1.5 rounded-t-xl text-sm font-medium shadow-2xl sm:hidden"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
 
-            <button
-              onClick={editingMessageId ? handleEdit : handleSend}
-              disabled={
-                sendMessageMutation.isPending ||
-                (!text.trim() &&
-                  selectedFiles.length === 0 &&
-                  !editingMessageId)
-              }
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 rounded-full p-3.5 shadow-xl transition transform hover:scale-110 active:scale-95 mb-1"
-            >
-              {editingMessageId ? <Edit2 size={22} /> : <Send size={22} />}
-            </button>
-          </div>
+  {/* Text Input */}
+  <div className="flex-1 relative">
+    <input
+      ref={inputRef}
+      type="text"
+      value={editingMessageId ? editText : text}
+      onChange={(e) =>
+        editingMessageId ? setEditText(e.target.value) : setText(e.target.value)
+      }
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          editingMessageId ? handleEdit() : handleSend();
+        }
+        if (e.key === "Escape") {
+          resetInput();
+          setShowEmoji(false);
+        }
+      }}
+      placeholder={
+        editingMessageId
+          ? "Edit message..."
+          : replyingTo
+          ? "Reply..."
+          : "Type a message..."
+      }
+      className="w-full bg-white/10 rounded-full py-3 px-5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/70 transition-all text-sm sm:text-base pr-12"
+    />
+
+    {/* Editing Indicator */}
+    {editingMessageId && (
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+        <Edit2 size={14} className="text-purple-400" />
+        <span className="text-purple-400 text-xs font-medium">Editing</span>
+      </div>
+    )}
+  </div>
+
+  {/* Send / Edit Button */}
+  <button
+    onClick={editingMessageId ? handleEdit : handleSend}
+    disabled={
+      sendMessageMutation.isPending ||
+      (!text.trim() && selectedFiles.length === 0 && !editingMessageId)
+    }
+    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95 flex-shrink-0 mb-0.5"
+    aria-label={editingMessageId ? "Edit" : "Send"}
+  >
+    {editingMessageId ? (
+      <Edit2 size={21} className="text-white" />
+    ) : (
+      <Send size={21} className="text-white" />
+    )}
+  </button>
+</div>
         </div>
       </div>
     </div>
