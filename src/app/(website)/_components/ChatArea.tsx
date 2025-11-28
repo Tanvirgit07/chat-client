@@ -182,8 +182,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col bg-gray-900/30 h-full">
       {/* Header */}
-      <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 p-3 sm:p-4">
-        <div className="flex items-center gap-3 sm:p-4">
+      <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 pr-6 pl-4 py-3 lg:pr-0 lg:pl-0 lg:py-0 border">
+        <div className="flex items-center gap-4 sm:p-4">
           <button onClick={onBack} className="lg:hidden text-white">
             <ArrowLeft size={24} />
           </button>
@@ -247,7 +247,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Messages Area */}
       <ScrollArea className="flex-1">
-        <div className="max-w-4xl mx-auto py-6 px-4 space-y-4">
+        <div className="max-w-4xl mx-auto py-6 px-6 space-y-4">
           {messages.length === 0 ? (
             <div className="text-center text-gray-400 pt-32">
               <h3 className="text-2xl font-bold text-white mb-2">
@@ -475,7 +475,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           )}
 
-          <div className="flex items-end gap-3">
+          <div className="flex justify-between items-center lg:gap-4 md:gap-3 gap-2">
             <input
               type="file"
               ref={fileInputRef}
