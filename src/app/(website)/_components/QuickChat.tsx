@@ -197,8 +197,8 @@ const QuickChat: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen w-full bg-gray-900 p-2 sm:p-4">
-      <div className="flex w-full max-w-[1600px] h-[calc(100vh-1rem)] sm:h-[90vh] shadow-2xl rounded-xl sm:rounded-2xl overflow-hidden border border-purple-500/20">
+    <div className="flex items-center justify-center min-h-[98vh] w-full bg-gray-900">
+      <div className="flex w-full max-w-[1600px] h-[calc(100vh-1rem)] sm:h-[90vh] shadow-2xl rounded-none lg:rounded-xl sm:rounded-2xl overflow-hidden border border-purple-500/20">
         
         {/* Sidebar - Mobile: হাইড হয় chat open হলে */}
         <div className={`${selectedUser ? 'hidden lg:flex' : 'flex'} w-full lg:w-80 xl:w-96`}>
