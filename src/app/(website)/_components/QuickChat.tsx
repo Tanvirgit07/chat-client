@@ -10,6 +10,7 @@ import ProfilePanel from "./ProfilePanel";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import useSocket from "../../../lib/socketIoConnection";
+import { X } from "lucide-react";
 
 export interface User {
   id: string;
@@ -45,7 +46,8 @@ const QuickChat: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [sharedMedia, setSharedMedia] = useState<string[]>([]); // নতুন
+  const [sharedMedia, setSharedMedia] = useState<string[]>([]);
+  const [showProfile, setShowProfile] = useState(false);
 
   const { data: session, status } = useSession();
 
@@ -195,11 +197,23 @@ const QuickChat: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen w-full bg-gray-900">
-      <div className="flex w-[80%] max-w-7xl h-[85vh] shadow-2xl rounded-2xl overflow-hidden border border-purple-500/20">
-        <Sidebar users={users} selectedUser={selectedUser} onSelectUser={setSelectedUser} />
+    <div className="flex items-center justify-center min-h-screen w-full bg-gray-900 p-2 sm:p-4">
+      <div className="flex w-full max-w-[1600px] h-[calc(100vh-1rem)] sm:h-[90vh] shadow-2xl rounded-xl sm:rounded-2xl overflow-hidden border border-purple-500/20">
+        
+        {/* Sidebar - Mobile: হাইড হয় chat open হলে */}
+        <div className={`${selectedUser ? 'hidden lg:flex' : 'flex'} w-full lg:w-80 xl:w-96`}>
+          <Sidebar 
+            users={users} 
+            selectedUser={selectedUser} 
+            onSelectUser={(user) => {
+              setSelectedUser(user);
+              setShowProfile(false);
+            }} 
+          />
+        </div>
 
-        <div className="flex-1 flex">
+        {/* Chat Area - শুধু selected user থাকলে দেখাবে */}
+        <div className={`${selectedUser ? 'flex' : 'hidden lg:flex'} flex-1`}>
           {!selectedUser ? (
             <EmptyState />
           ) : (
@@ -208,12 +222,38 @@ const QuickChat: React.FC = () => {
               messages={messages}
               myId={myId}
               onMessageSent={handleNewMessage}
+              onBack={() => setSelectedUser(null)}
+              onProfileClick={() => setShowProfile(!showProfile)}
             />
           )}
         </div>
 
+        {/* Profile Panel - Desktop: সবসময় দেখাবে, Mobile: Toggle */}
         {selectedUser && (
-          <ProfilePanel selectedUser={selectedUser} sharedMedia={sharedMedia} />
+          <>
+            {/* Desktop */}
+            <div className="hidden xl:block w-96">
+              <ProfilePanel selectedUser={selectedUser} sharedMedia={sharedMedia} />
+            </div>
+
+            {/* Mobile/Tablet Overlay */}
+            {showProfile && (
+              <div className="fixed inset-0 z-50 xl:hidden">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowProfile(false)} />
+                <div className="absolute right-0 top-0 bottom-0 w-full sm:w-96 animate-in slide-in-from-right">
+                  <div className="relative h-full">
+                    <button
+                      onClick={() => setShowProfile(false)}
+                      className="absolute top-4 left-4 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition"
+                    >
+                      <X size={20} />
+                    </button>
+                    <ProfilePanel selectedUser={selectedUser} sharedMedia={sharedMedia} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
