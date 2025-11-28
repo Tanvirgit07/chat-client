@@ -7,7 +7,7 @@ import Sidebar from "./Sidebar";
 import EmptyState from "./EmptyState";
 import ChatArea from "./ChatArea";
 import ProfilePanel from "./ProfilePanel";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import useSocket from "../../../lib/socketIoConnection";
 import { X } from "lucide-react";
@@ -30,6 +30,8 @@ export interface ChatMessage {
   createdAt: string;
   updatedAt?: string;
   seen?: boolean;
+  edited?: boolean;
+  deletedBy?: string[];
 }
 
 interface SessionUser {
@@ -50,6 +52,7 @@ const QuickChat: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
 
   const { data: session, status } = useSession();
+  const queryClient = useQueryClient();
 
   const rawUser = session?.user as unknown;
   const user: SessionUser | undefined = rawUser
@@ -119,6 +122,102 @@ const QuickChat: React.FC = () => {
       );
       if (!res.ok) throw new Error("Failed to mark as seen");
       return res.json();
+    },
+  });
+
+  // Edit Message Mutation
+  const editMessageMutation = useMutation({
+    mutationFn: async ({ messageId, newText }: { messageId: string; newText: string }) => {
+      const formData = new FormData();
+      formData.append("newText", newText);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/message/edit-message/${messageId}`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${TOKEN}`,
+          },
+          body: formData,
+        }
+      );
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to edit message");
+      }
+      return res.json();
+    },
+    onMutate: async ({ messageId, newText }) => {
+      await queryClient.cancelQueries({ queryKey: ["selectedUserData", selectedUser?.id] });
+
+      const previousMessages = queryClient.getQueryData<any>(["selectedUserData", selectedUser?.id]);
+
+      queryClient.setQueryData(["selectedUserData", selectedUser?.id], (old: any) => {
+        if (!old?.message) return old;
+        return {
+          ...old,
+          message: old.message.map((msg: ChatMessage) =>
+            msg._id === messageId ? { ...msg, text: newText, edited: true } : msg
+          ),
+        };
+      });
+
+      return { previousMessages };
+    },
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(["selectedUserData", selectedUser?.id], context?.previousMessages);
+    },
+  });
+
+  // Delete For Me
+  const deleteForMeMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/message/delete-message/${messageId}`,
+        {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${TOKEN}` },
+        }
+      );
+      if (!res.ok) throw new Error("Failed to delete");
+      return res.json();
+    },
+    onMutate: async (messageId) => {
+      await queryClient.cancelQueries({ queryKey: ["selectedUserData", selectedUser?.id] });
+
+      queryClient.setQueryData(["selectedUserData", selectedUser?.id], (old: any) => {
+        if (!old?.message) return old;
+        return {
+          ...old,
+          message: old.message.map((msg: ChatMessage) =>
+            msg._id === messageId ? { ...msg, deletedBy: [...(msg.deletedBy || []), myId] } : msg
+          ),
+        };
+      });
+    },
+  });
+
+  // Delete For Everyone
+  const deleteForEveryoneMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/message/delete-message-everyone/${messageId}`,
+        {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${TOKEN}` },
+        }
+      );
+      if (!res.ok) throw new Error("Failed to delete for everyone");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["selectedUserData", selectedUser?.id], (old: any) => {
+        if (!old?.message) return old;
+        return {
+          ...old,
+          message: old.message.filter((msg: ChatMessage) => msg._id !== "being-deleted"),
+        };
+      });
     },
   });
 
@@ -196,11 +295,28 @@ const QuickChat: React.FC = () => {
     }
   };
 
+  // Pass these to ChatArea
+  const messageActions = {
+    onEdit: (messageId: string, newText: string) => {
+      editMessageMutation.mutate({ messageId, newText });
+    },
+    onDeleteForMe: (messageId: string) => {
+      deleteForMeMutation.mutate(messageId);
+    },
+    onDeleteForEveryone: (messageId: string) => {
+      // Optimistic delete
+      queryClient.setQueryData(["selectedUserData", selectedUser?.id], (old: any) => ({
+        ...old,
+        message: old.message.map((m: ChatMessage) => m._id === messageId ? { ...m, _id: "being-deleted" } : m),
+      }));
+      deleteForEveryoneMutation.mutate(messageId);
+    },
+  };
+
   return (
     <div className="flex items-center justify-center min-h-[98vh] w-full bg-gray-900">
       <div className="flex w-full max-w-[1600px] h-[calc(100vh-1rem)] sm:h-[90vh] shadow-2xl rounded-none lg:rounded-xl sm:rounded-2xl overflow-hidden border border-purple-500/20">
         
-        {/* Sidebar - Mobile: হাইড হয় chat open হলে */}
         <div className={`${selectedUser ? 'hidden lg:flex' : 'flex'} w-full lg:w-80 xl:w-96`}>
           <Sidebar 
             users={users} 
@@ -212,7 +328,6 @@ const QuickChat: React.FC = () => {
           />
         </div>
 
-        {/* Chat Area - শুধু selected user থাকলে দেখাবে */}
         <div className={`${selectedUser ? 'flex' : 'hidden lg:flex'} flex-1`}>
           {!selectedUser ? (
             <EmptyState />
@@ -224,19 +339,17 @@ const QuickChat: React.FC = () => {
               onMessageSent={handleNewMessage}
               onBack={() => setSelectedUser(null)}
               onProfileClick={() => setShowProfile(!showProfile)}
+              messageActions={messageActions}
             />
           )}
         </div>
 
-        {/* Profile Panel - Desktop: সবসময় দেখাবে, Mobile: Toggle */}
         {selectedUser && (
           <>
-            {/* Desktop */}
             <div className="hidden xl:block w-96">
               <ProfilePanel selectedUser={selectedUser} sharedMedia={sharedMedia} />
             </div>
 
-            {/* Mobile/Tablet Overlay */}
             {showProfile && (
               <div className="fixed inset-0 z-50 xl:hidden">
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowProfile(false)} />
