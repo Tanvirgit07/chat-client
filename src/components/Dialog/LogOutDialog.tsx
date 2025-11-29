@@ -26,43 +26,53 @@ export function LogoutModal() {
     router.push("/signin");
   };
 
-  // যদি লোডিং হয় তাহলে কিছু দেখাবে না (অপশনাল)
   if (status === "loading") return null;
 
-  // লগইন করা আছে কিনা চেক
   const isLoggedIn = !!session?.user;
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        {isLoggedIn ? (
-          <button className="block w-full text-white px-4 py-2 rounded hover:bg-purple-700/30 transition-colors text-left">
-            Logout
-          </button>
-        ) : (
-          <button className="block w-full text-white px-4 py-2 rounded hover:bg-purple-700/30 transition-colors text-left">
-            Login
-          </button>
-        )}
+        <Button
+          variant="ghost"
+          className={`
+            w-full justify-start gap-3 px-4 py-3 rounded-xl text-left
+            font-medium transition-all duration-200
+            ${isLoggedIn 
+              ? "text-red-400 hover:text-red-300 hover:bg-red-500/10" 
+              : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+            }
+          `}
+        >
+          {isLoggedIn ? (
+            <>
+              Logout
+            </>
+          ) : (
+            <>
+              Login
+            </>
+          )}
+        </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[400px] bg-black/90 border border-purple-500/30 text-white shadow-xl rounded-xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-white">
-            {isLoggedIn ? "Confirm Logout" : "Login to Continue"}
+      <DialogContent className="sm:max-w-md bg-gray-950/95 backdrop-blur-xl border border-purple-500/20 text-white rounded-2xl shadow-2xl">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            {isLoggedIn ? "Ready to Leave?" : "Welcome Back!"}
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-gray-300 text-base">
             {isLoggedIn
-              ? "Are you sure you want to logout from your account?"
-              : "You need to login to access this feature."}
+              ? "You'll be logged out from your account. Come back soon! 👋"
+              : "Login to unlock all premium features and continue your journey."}
           </DialogDescription>
         </DialogHeader>
 
-        <DialogFooter className="flex justify-end gap-3 pt-4">
+        <DialogFooter className="flex flex-row gap-3 sm:justify-end mt-6">
           <DialogClose asChild>
             <Button
               variant="outline"
-              className="border-gray-500 text-gray-200 hover:bg-gray-700/40"
+              className="flex-1sm:flex-initial px-8 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold shadow-lg hover:shadow-red-500/25 transition-all duration-300 transform hover:scale-105"
             >
               Cancel
             </Button>
@@ -70,18 +80,17 @@ export function LogoutModal() {
 
           {isLoggedIn ? (
             <Button
-              variant="destructive"
-              className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleLogout}
+              className="flex-1 sm:flex-initial px-8 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold shadow-lg hover:shadow-red-500/25 transition-all duration-300 transform hover:scale-105"
             >
               Logout
             </Button>
           ) : (
             <Button
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
               onClick={handleLogin}
+              className="flex-1 sm:flex-initial px-8 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg hover:shadow-purple-500/30 transition-all duration-300 transform hover:scale-105"
             >
-              Login
+              Login Now
             </Button>
           )}
         </DialogFooter>

@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Upload } from "lucide-react";
+import { Upload, Camera } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -12,6 +11,7 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,6 @@ import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 
-// **Form schema**
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   bio: z
@@ -35,12 +34,12 @@ export default function ProfilePage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [savingForm, setSavingForm] = useState(false);
 
-  const session = useSession();
-  const TOKEN = session?.data?.user?.accessToken;
-  const userId = session?.data?.user?.id;
+  const { data: session } = useSession();
+  const TOKEN = session?.user?.accessToken;
+  const userId = session?.user?.id;
 
-  // ---------- 🔥 Fetch Single User ----------
-  const { data: userData } = useQuery({
+  // ফিক্স: সঠিক নামে ডাটা নেওয়া হচ্ছে
+  const { data: userResponse } = useQuery({
     queryKey: ["singleUser", userId],
     queryFn: async () => {
       const res = await fetch(
@@ -51,41 +50,41 @@ export default function ProfilePage() {
           },
         }
       );
-
       if (!res.ok) throw new Error("Failed to fetch user");
-
       return res.json();
     },
     enabled: !!TOKEN && !!userId,
   });
 
-  // ---------- 🔥 Initialize Form ----------
+  const user = userResponse?.user; // এখানে সঠিক ডাটা পাচ্ছি
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { name: "", bio: "" },
   });
 
-  // ---------- 🔥 Set form values after fetching user ----------
+  // ডাটা আসার সাথে সাথে ফর্ম + ইমেজ সেট করা
   useEffect(() => {
-    if (userData?.user) {
-      form.setValue("name", userData.user.fullName || "");
-      form.setValue("bio", userData.user.bio || ""); // BIO not available, fallback to empty string
-      setProfileImage(userData.user.profileImage || null); // FIXED IMAGE FIELD
+    if (user) {
+      form.setValue("name", user.fullName || "");
+      form.setValue("bio", user.bio || "");
+      setProfileImage(user.profileImage || null);
     }
-  }, [userData, form]);
+  }, [user, form]);
 
-  // ---------- 🔥 Image Upload ----------
+  // ইমেজ আপলোড – ইনস্ট্যান্ট প্রিভিউ + সার্ভারে পাঠানো
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Preview
+    // ইনস্ট্যান্ট লোকাল প্রিভিউ (সবচেয়ে জরুরি)
     const reader = new FileReader();
-    reader.onloadend = () => setProfileImage(reader.result as string);
+    reader.onloadend = () => {
+      setProfileImage(reader.result as string);
+    };
     reader.readAsDataURL(file);
 
     setUploadingImage(true);
-
     const formData = new FormData();
     formData.append("image", file);
 
@@ -98,26 +97,23 @@ export default function ProfilePage() {
           body: formData,
         }
       );
-
       const data = await res.json();
-
       if (res.ok) {
-        setProfileImage(data.imageUrl);
-        toast.success("Profile image updated!");
+        setProfileImage(data.imageUrl || reader.result); // সার্ভার থেকে URL পেলে সেটা, না পেলে লোকাল
+        toast.success("Profile picture updated!");
       } else {
-        toast.error(data.message || "Image upload failed");
+        toast.error(data.message || "Upload failed");
       }
-    } catch {
-      toast.error("Something went wrong");
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err) {
+      toast.error("Upload failed");
     } finally {
       setUploadingImage(false);
     }
   };
 
-  // ---------- 🔥 Submit Name + Bio ----------
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setSavingForm(true);
-
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/user/update-profile`,
@@ -134,12 +130,11 @@ export default function ProfilePage() {
         }
       );
 
-      const data = await res.json();
-
       if (res.ok) {
-        toast.success("Profile saved successfully!");
+        toast.success("Profile updated successfully!");
       } else {
-        toast.error(data.message || "Failed to save");
+        const data = await res.json();
+        toast.error(data.message || "Failed to update");
       }
     } catch {
       toast.error("Network error");
@@ -148,116 +143,145 @@ export default function ProfilePage() {
     }
   };
 
+  // লাইভ প্রিভিউর জন্য রিয়েল-টাইম ভ্যালু
+  const currentName = form.watch("name") || user?.fullName || "Your Name";
+  const currentBio = form.watch("bio") || user?.bio || "No bio yet";
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="flex flex-col md:flex-row items-start md:items-stretch relative z-10 w-full max-w-4xl bg-black/10 backdrop-blur-sm border border-white rounded-3xl p-8 gap-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-950 via-black to-pink-950 flex items-center justify-center lg:p-4 p-0 ">
+      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
 
-        {/* Left - Image + Form */}
-        <div className="flex-1 md:w-2/3 flex flex-col justify-start">
-          <h2 className="text-white text-2xl font-semibold mb-6">
-            Profile details
-          </h2>
+        {/* Left Side – Edit Form */}
+        <div className="order-2 md:order-1 space-y-8 p-4 lg:p-0">
+          <h2 className="text-3xl font-bold text-white text-center md:text-left">Edit Profile</h2>
 
-          {/* Profile Image */}
-          <div className="flex items-center gap-4 mb-6">
-            <label htmlFor="profile-upload" className="cursor-pointer">
-              <div className="w-20 h-20 bg-gray-400 rounded-full flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity">
+          <div className="flex justify-center md:justify-start">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-2xl overflow-hidden ring-4 ring-purple-500/30 shadow-2xl">
                 {profileImage ? (
                   <Image
-                    width={80}
-                    height={80}
                     src={profileImage}
                     alt="Profile"
+                    width={128}
+                    height={128}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <Upload className="text-white" size={24} />
+                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                    <Upload className="w-12 h-12 text-white/60" />
+                  </div>
                 )}
               </div>
-            </label>
 
-            <input
-              id="profile-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-              disabled={uploadingImage}
-            />
-
-            <div>
-              <span className="text-gray-300 text-sm block">
-                Upload profile image
-              </span>
-              {uploadingImage && (
-                <span className="text-xs text-yellow-400">Uploading...</span>
-              )}
+              <label
+                htmlFor="profile-upload"
+                className="absolute inset-0 rounded-2xl bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              >
+                <Camera className="w-10 h-10 text-white" />
+              </label>
+              <input
+                id="profile-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                disabled={uploadingImage}
+              />
             </div>
           </div>
 
-          {/* Name + Bio Form */}
+          {uploadingImage && (
+            <p className="text-center md:text-left text-yellow-400 text-sm animate-pulse">
+              Uploading image...
+            </p>
+          )}
+
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              
-              {/* Name */}
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel className="text-gray-200">Full Name</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Your name"
                         {...field}
-                        className="w-full bg-transparent border border-white text-white placeholder-gray-400 rounded-lg px-4 py-3"
+                        placeholder="Enter your name"
+                        className="bg-white/5 border-white/10 text-white placeholder-gray-500 rounded-xl px-5 py-4 focus:ring-2 focus:ring-purple-500/50"
                       />
                     </FormControl>
-                    <FormMessage className="text-red-400 text-sm" />
+                    <FormMessage className="text-red-400" />
                   </FormItem>
                 )}
               />
 
-              {/* Bio */}
               <FormField
                 control={form.control}
                 name="bio"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel className="text-gray-200">Bio</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Tell us about yourself..."
                         {...field}
-                        rows={4}
-                        className="w-full bg-transparent border border-white text-white placeholder-gray-400 rounded-lg px-4 py-3 resize-none"
+                        placeholder="Write something about yourself..."
+                        rows={5}
+                        className="bg-white/5 border-white/10 text-white placeholder-gray-500 rounded-xl px-5 py-4 resize-none focus:ring-2 focus:ring-purple-500/50"
                       />
                     </FormControl>
-                    <FormMessage className="text-red-400 text-sm" />
+                    <FormMessage className="text-red-400" />
                   </FormItem>
                 )}
               />
 
-              {/* Submit */}
               <Button
                 type="submit"
-                disabled={savingForm}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 rounded-full transition-all mt-6"
+                disabled={savingForm || uploadingImage}
+                className="w-full py-6 text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl shadow-lg hover:shadow-purple-500/30 transform hover:scale-[1.02] transition-all"
               >
                 {savingForm ? "Saving..." : "Save Profile"}
               </Button>
-
             </form>
           </Form>
         </div>
 
-        {/* Right Image */}
-        <div className="flex-1 md:w-1/3 flex justify-center items-center">
-          <Image
-            src="/images/chat-auth1.webp"
-            width={200}
-            height={250}
-            alt="chat decoration"
-            className="rounded-xl"
-          />
+        {/* Right Side – Live Preview */}
+        <div className="order-1 md:order-2 flex items-center justify-center">
+          <div className="w-full max-w-md bg-black/40 backdrop-blur-xl lg:rounded-3xl rounded-none border border-white/10 p-10 shadow-2xl">
+            <h3 className="text-xl font-semibold text-gray-300 mb-8 text-center">Live Preview</h3>
+
+            <div className="w-40 h-40 mx-auto rounded-full overflow-hidden ring-4 ring-purple-500/40 shadow-2xl mb-8">
+              {profileImage ? (
+                <Image
+                  src={profileImage}
+                  alt="Preview"
+                  width={160}
+                  height={160}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                  <Upload className="w-20 h-20 text-white/50" />
+                </div>
+              )}
+            </div>
+
+            <h1 className="text-3xl font-bold text-white text-center mb-3">{currentName}</h1>
+            <p className="text-gray-400 text-center mb-6">{user?.email || "your@email.com"}</p>
+
+            <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+              <p className="text-gray-300 text-center italic leading-relaxed">
+                {currentBio}
+              </p>
+            </div>
+
+            <div className="mt-8 text-center">
+              <span className="px-5 py-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-300 rounded-full text-sm font-medium border border-purple-500/30">
+                Updated in Real-time
+              </span>
+            </div>
+          </div>
         </div>
 
       </div>
