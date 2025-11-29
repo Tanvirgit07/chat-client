@@ -684,38 +684,95 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               <ImageIcon size={21} className="text-white" />
             </button>
 
-            <div className="relative flex-shrink-0">
-              <button
-                onClick={() => setShowEmoji((p) => !p)}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95"
-              >
-                <Smile size={21} className="text-white" />
-              </button>
-              {showEmoji && (
-                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 sm:left-auto sm:translate-x-0">
-                  <div className="relative">
-                    <EmojiPicker
-                      onEmojiClick={(e) => {
-                        const emoji = e.emoji;
-                        if (editingMessageId) setEditText((t) => t + emoji);
-                        else setText((t) => t + emoji);
-                        inputRef.current?.focus();
-                      }}
-                      theme={Theme.DARK}
-                      height={360}
-                      width={320}
-                      lazyLoadEmojis={true}
-                    />
-                    <button
-                      onClick={() => setShowEmoji(false)}
-                      className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black/95 text-white px-4 py-1.5 rounded-t-xl text-sm font-medium shadow-2xl sm:hidden"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+           {/* Emoji Button + Fully Responsive Picker */}
+<div className="relative flex-shrink-0">
+  <button
+    onClick={() => setShowEmoji(prev => !prev)}
+    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95"
+  >
+    <Smile size={21} className="text-white" />
+  </button>
+
+  {/* Magic: 100% Responsive Emoji Picker for ALL Devices */}
+  {showEmoji && (
+    <>
+      {/* Mobile & Tablet: Full Bottom Sheet */}
+      <div className="fixed inset-0 z-[60] flex items-end justify-center sm:hidden">
+        <div
+          className="w-full max-w-md bg-gray-900 rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-white/10">
+            <h3 className="text-lg font-semibold text-white">Choose Emoji</h3>
+            <button
+              onClick={() => setShowEmoji(false)}
+              className="text-white/70 hover:text-white p-2"
+            >
+              <X size={26} />
+            </button>
+          </div>
+
+          {/* Picker */}
+          <div className="h-96">
+            <EmojiPicker
+              onEmojiClick={(e) => {
+                const emoji = e.emoji;
+                if (editingMessageId) {
+                  setEditText(prev => prev + emoji);
+                } else {
+                  setText(prev => prev + emoji);
+                }
+                inputRef.current?.focus();
+                // মোবাইলে ইমোজি বেছে নিলেও পিকার বন্ধ হবে না (WhatsApp এর মতো)
+              }}
+              theme={Theme.DARK}
+              width="100%"
+              height="100%"
+              lazyLoadEmojis={true}
+              previewConfig={{ showPreview: false }}
+              skinTonesDisabled={false}
+            />
+          </div>
+        </div>
+
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/60"
+          onClick={() => setShowEmoji(false)}
+        />
+      </div>
+
+      {/* Desktop & Large Screens: Floating Picker (আগের মতোই কিন্তু আরো সুন্দর) */}
+      <div className="hidden sm:block absolute bottom-16 left-1/2 -translate-x-1/2 z-50">
+        <div className="bg-gray-900/95 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="flex items-center justify-between p-3 border-b border-white/10">
+            <span className="text-sm font-medium text-white/80">Emojis</span>
+            <button
+              onClick={() => setShowEmoji(false)}
+              className="text-white/60 hover:text-white p-1"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <EmojiPicker
+            onEmojiClick={(e) => {
+              const emoji = e.emoji;
+              if (editingMessageId) setEditText(prev => prev + emoji);
+              else setText(prev => prev + emoji);
+              inputRef.current?.focus();
+            }}
+            theme={Theme.DARK}
+            width={350}
+            height={400}
+            lazyLoadEmojis={true}
+            previewConfig={{ showPreview: false }}
+          />
+        </div>
+      </div>
+    </>
+  )}
+</div>
 
             {/* Mic Button */}
             {!editingMessageId && !recordedBlob && (
