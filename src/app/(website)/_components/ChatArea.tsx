@@ -471,69 +471,104 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-10 w-10 rounded-full bg-white/10 text-white/70 hover:text-white hover:bg-white/20 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg"
+                          className="
+          h-9 w-9 flex items-center justify-center
+          rounded-full
+          bg-white/5 
+          text-white/70
+          hover:text-white 
+          hover:bg-white/10
+          backdrop-blur-md
+          transition-all duration-200
+          shadow-md
+        "
                         >
-                          <MoreVertical size={20} />
-                          <span className="sr-only">More options</span>
+                          <MoreVertical size={18} />
                         </Button>
                       </PopoverTrigger>
 
                       <PopoverContent
-                        sideOffset={10}
-                        align="end"
-                        className="w-56 p-3 bg-gray-900/95 backdrop-blur-2xl border border-purple-500/30 rounded-2xl shadow-2xl"
+                        className="
+        w-52 p-2 
+        bg-gray-900/90 
+        border border-white/10
+        backdrop-blur-xl 
+        rounded-2xl
+        shadow-xl
+        space-y-1
+      "
                       >
-                        <div className="space-y-1">
-                          {/* Reply */}
+                        <Button
+                          variant="ghost"
+                          className="
+          w-full justify-start 
+          text-white/80 
+          hover:text-white 
+          hover:bg-white/10
+          rounded-lg
+        "
+                          onClick={() => setReplyingTo(msg)}
+                        >
+                          <Reply size={14} className="mr-2" /> Reply
+                        </Button>
+
+                        {isMine && msg.messageType === "text" && (
                           <Button
                             variant="ghost"
-                            className="w-full justify-start text-white/80 hover:text-white hover:bg-white/10 rounded-xl h-12 text-left font-medium"
-                            onClick={() => setReplyingTo(msg)}
+                            className="
+            w-full justify-start 
+            text-white/80 
+            hover:text-white 
+            hover:bg-white/10
+            rounded-lg
+          "
+                            onClick={() => startEdit(msg)}
                           >
-                            <Reply size={18} className="mr-3" />
-                            Reply
+                            <Edit2 size={14} className="mr-2" /> Edit
                           </Button>
+                        )}
 
-                          {/* Edit – only for text & own message */}
-                          {isMine && msg.messageType === "text" && (
+                        {isMine && (
+                          <>
                             <Button
                               variant="ghost"
-                              className="w-full justify-start text-white/80 hover:text-white hover:bg-white/10 rounded-xl h-12 text-left font-medium"
-                              onClick={() => startEdit(msg)}
+                              className="
+    w-full justify-start 
+    text-red-400 
+    hover:bg-red-500/20
+    hover:text-red-300 
+    rounded-lg
+  "
+                              onClick={() => {
+                                // এই চেকটা যোগ করলেই সব ঠিক!
+                                if (msg._id?.startsWith("temp_")) {
+                                  return; // কিছুই করবে না → এরর আসবে না
+                                }
+                                messageActions?.onDeleteForEveryone(msg._id!);
+                              }}
                             >
-                              <Edit2 size={18} className="mr-3" />
-                              Edit Message
+                              <Users size={14} className="mr-2" /> Delete for
+                              Everyone
                             </Button>
-                          )}
 
-                          {/* Delete for Everyone – only if not temp */}
-                          {isMine && !msg._id?.startsWith("temp_") && (
                             <Button
                               variant="ghost"
-                              className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-600/20 rounded-xl h-12 text-left font-semibold"
-                              onClick={() =>
-                                messageActions?.onDeleteForEveryone(msg._id!)
-                              }
-                            >
-                              <Users size={18} className="mr-3" />
-                              Delete for Everyone
-                            </Button>
-                          )}
-
-                          {/* Delete for Me – always for own messages */}
-                          {isMine && (
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-600/20 rounded-xl h-12 text-left font-semibold border-t border-red-500/20 pt-3 mt-2"
+                              className="
+              w-full justify-start 
+              text-red-400 
+              hover:bg-red-500/20 
+              hover:text-red-300
+              rounded-lg
+            "
                               onClick={() =>
                                 messageActions?.onDeleteForMe(msg._id!)
                               }
                             >
-                              <Trash2 size={18} className="mr-3" />
-                              Delete for Me
+                              <Trash2 size={14} className="mr-2" /> Delete for
+                              Me
                             </Button>
-                          )}
-                        </div>
+                          </>
+                        )}
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -649,95 +684,38 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               <ImageIcon size={21} className="text-white" />
             </button>
 
-            {/* Emoji Button + Fully Responsive Picker */}
-<div className="relative flex-shrink-0">
-  <button
-    onClick={() => setShowEmoji(prev => !prev)}
-    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95"
-  >
-    <Smile size={21} className="text-white" />
-  </button>
-
-  {/* Magic: 100% Responsive Emoji Picker for ALL Devices */}
-  {showEmoji && (
-    <>
-      {/* Mobile & Tablet: Full Bottom Sheet */}
-      <div className="fixed inset-0 z-[60] flex items-end justify-center sm:hidden">
-        <div
-          className="w-full max-w-md bg-gray-900 rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <h3 className="text-lg font-semibold text-white">Choose Emoji</h3>
-            <button
-              onClick={() => setShowEmoji(false)}
-              className="text-white/70 hover:text-white p-2"
-            >
-              <X size={26} />
-            </button>
-          </div>
-
-          {/* Picker */}
-          <div className="h-96">
-            <EmojiPicker
-              onEmojiClick={(e) => {
-                const emoji = e.emoji;
-                if (editingMessageId) {
-                  setEditText(prev => prev + emoji);
-                } else {
-                  setText(prev => prev + emoji);
-                }
-                inputRef.current?.focus();
-                // মোবাইলে ইমোজি বেছে নিলেও পিকার বন্ধ হবে না (WhatsApp এর মতো)
-              }}
-              theme={Theme.DARK}
-              width="100%"
-              height="100%"
-              lazyLoadEmojis={true}
-              previewConfig={{ showPreview: false }}
-              skinTonesDisabled={false}
-            />
-          </div>
-        </div>
-
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/60"
-          onClick={() => setShowEmoji(false)}
-        />
-      </div>
-
-      {/* Desktop & Large Screens: Floating Picker (আগের মতোই কিন্তু আরো সুন্দর) */}
-      <div className="hidden sm:block absolute bottom-16 left-1/2 -translate-x-1/2 z-50">
-        <div className="bg-gray-900/95 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between p-3 border-b border-white/10">
-            <span className="text-sm font-medium text-white/80">Emojis</span>
-            <button
-              onClick={() => setShowEmoji(false)}
-              className="text-white/60 hover:text-white p-1"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <EmojiPicker
-            onEmojiClick={(e) => {
-              const emoji = e.emoji;
-              if (editingMessageId) setEditText(prev => prev + emoji);
-              else setText(prev => prev + emoji);
-              inputRef.current?.focus();
-            }}
-            theme={Theme.DARK}
-            width={350}
-            height={400}
-            lazyLoadEmojis={true}
-            previewConfig={{ showPreview: false }}
-          />
-        </div>
-      </div>
-    </>
-  )}
-</div>
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setShowEmoji((p) => !p)}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95"
+              >
+                <Smile size={21} className="text-white" />
+              </button>
+              {showEmoji && (
+                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 sm:left-auto sm:translate-x-0">
+                  <div className="relative">
+                    <EmojiPicker
+                      onEmojiClick={(e) => {
+                        const emoji = e.emoji;
+                        if (editingMessageId) setEditText((t) => t + emoji);
+                        else setText((t) => t + emoji);
+                        inputRef.current?.focus();
+                      }}
+                      theme={Theme.DARK}
+                      height={360}
+                      width={320}
+                      lazyLoadEmojis={true}
+                    />
+                    <button
+                      onClick={() => setShowEmoji(false)}
+                      className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black/95 text-white px-4 py-1.5 rounded-t-xl text-sm font-medium shadow-2xl sm:hidden"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Mic Button */}
             {!editingMessageId && !recordedBlob && (
