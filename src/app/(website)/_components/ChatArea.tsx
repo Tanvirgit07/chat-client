@@ -677,9 +677,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   isRecording
                     ? "bg-red-600 hover:bg-red-700"
                     : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                } rounded-full p-3.5 shadow-xl transition-all hover:scale-110 active:scale-95 flex-shrink-0`}
+                } rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95 flex-shrink-0`}
               >
-                <Mic size={24} className="text-white" />
+                <Mic size={20} className="text-white" />
               </button>
             )}
 
