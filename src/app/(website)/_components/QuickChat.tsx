@@ -220,13 +220,23 @@ const QuickChat: React.FC = () => {
 };
 
   const messageActions = {
-    onEdit: (id: string, text: string) => editMessageMutation.mutate({ messageId: id, newText: text }),
-    onDeleteForMe: (id: string) => deleteForMeMutation.mutate(id),
-    onDeleteForEveryone: (id: string) => {
-      setMessages(prev => prev.map(m => m._id === id ? { ...m, _id: "being-deleted" } : m));
-      deleteForEveryoneMutation.mutate(id);
-    },
-  };
+  onEdit: (id: string, text: string) => editMessageMutation.mutate({ messageId: id, newText: text }),
+  
+  onDeleteForMe: (id: string) => {
+    deleteForMeMutation.mutate(id);
+  },
+  
+  onDeleteForEveryone: (id: string) => {
+    // এটাই ম্যাজিক লাইন — sender এর কাছেও ইনস্ট্যান্ট মুছে যাবে
+    setMessages(prev => prev.filter(m => m._id !== id));
+    
+    // temp message হলে শুধু UI থেকে মুছে দিব, API কল লাগবে না
+    if (id.startsWith("temp_")) return;
+
+    // আসল মেসেজ হলে তবেই API কল
+    deleteForEveryoneMutation.mutate(id);
+  },
+};
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 lg:p-2">
