@@ -22,22 +22,29 @@ export interface User {
   profileImage?: string;
 }
 
+// QuickChat.tsx → এই interface টা পুরোটা রিপ্লেস করো
+
+// QuickChat.tsx → এই interface টা পুরোটা রিপ্লেস করো
 export interface ChatMessage {
   _id?: string;
   senderId: string;
   receiverId: string;
   text?: string;
-  image?: string;
+  image?: string | null;
+  voice?: string | null;                    // আগেও ছিল
+  voiceDuration?: number;
+  messageType?: "text" | "image" | "voice";
   createdAt: string;
   updatedAt?: string;
   seen?: boolean;
   edited?: boolean;
   deletedBy?: string[];
 
-  // Reply Feature এর জন্য
+  // Reply related fields
   replyTo?: string | null;
   replyToText?: string;
-  replyToImage?: string;
+  replyToImage?: string | null;
+  replyToVoice?: string | null;              // ← এটা যোগ করো (যাতে voice reply preview আসে)
   replyToSenderName?: string;
 }
 
