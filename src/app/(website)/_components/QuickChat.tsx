@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // components/chat/QuickChat.tsx
@@ -139,14 +140,14 @@ const QuickChat: React.FC = () => {
   });
 
   const socket = useSocket(
-   (message: ChatMessage) => {
-  console.log("Realtime message received:", message); // এই লগটা দেখো!
+    (message: ChatMessage) => {
+      console.log("Realtime message received:", message); // এই লগটা দেখো!
 
-  // শুধু আমার সাথে সম্পর্কিত মেসেজ গ্রহণ করো
-  if (message.senderId === myId || message.receiverId === myId) {
-    handleNewMessage(message);
-  }
-},
+      // শুধু আমার সাথে সম্পর্কিত মেসেজ গ্রহণ করো
+      if (message.senderId === myId || message.receiverId === myId) {
+        handleNewMessage(message);
+      }
+    },
     (onlineIds: string[]) => setOnlineUsers(onlineIds),
     (editedMessage: ChatMessage) => {
       setMessages((prev) =>
@@ -211,39 +212,37 @@ const QuickChat: React.FC = () => {
     }
   }, [selectedUserData, myId]);
 
+  const handleNewMessage = (message: ChatMessage) => {
+    if (message.senderId !== myId && message.receiverId !== myId) return;
 
+    setMessages((prev) => {
+      // আগে থেকে থাকলে রিপ্লেস
+      if (prev.some((m) => m._id === message._id)) {
+        return prev.map((m) => (m._id === message._id ? message : m));
+      }
 
-const handleNewMessage = (message: ChatMessage) => {
-  if (message.senderId !== myId && message.receiverId !== myId) return;
+      // temp message খুঁজে বের করো — ইমেজ/ভয়েসের জন্য
+      const tempIndex = prev.findIndex((m) => {
+        if (!m._id?.startsWith("temp_")) return false;
+        if (m.messageType !== message.messageType) return false;
 
-  setMessages((prev) => {
-    // আগে থেকে থাকলে রিপ্লেস
-    if (prev.some((m) => m._id === message._id)) {
-      return prev.map((m) => (m._id === message._id ? message : m));
-    }
+        if (m.messageType === "text") return m.text === message.text;
+        if (m.messageType === "image") return !!m.image && !!message.image;
+        if (m.messageType === "voice")
+          return m.voiceDuration === message.voiceDuration;
 
-    // temp message খুঁজে বের করো — ইমেজ/ভয়েসের জন্য
-    const tempIndex = prev.findIndex((m) => {
-      if (!m._id?.startsWith("temp_")) return false;
-      if (m.messageType !== message.messageType) return false;
+        return false;
+      });
 
-      if (m.messageType === "text") return m.text === message.text;
-      if (m.messageType === "image") return !!m.image && !!message.image;
-      if (m.messageType === "voice") return m.voiceDuration === message.voiceDuration;
+      if (tempIndex !== -1) {
+        const updated = [...prev];
+        updated[tempIndex] = message;
+        return updated;
+      }
 
-      return false;
+      return [...prev, message];
     });
-
-    if (tempIndex !== -1) {
-      const updated = [...prev];
-      updated[tempIndex] = message;
-      return updated;
-    }
-
-    return [...prev, message];
-  });
-};
-
+  };
 
   const messageActions = {
     onEdit: (id: string, text: string) =>
@@ -343,17 +342,33 @@ const handleNewMessage = (message: ChatMessage) => {
           callerName={incomingCall.callerName}
           callerImage={incomingCall.callerImage}
           isVideo={incomingCall.isVideo}
-          onAccept={() => {
-            socket?.emit("call-accept", {
-              callerId: incomingCall.callerId,
-              roomName: incomingCall.roomName,
-            });
-            setCallData({
-              roomName: incomingCall.roomName,
-              token: "accepted",
-              isVideo: incomingCall.isVideo,
-            });
-            setIncomingCall(null);
+          onAccept={async () => {
+            const roomName = incomingCall.roomName;
+            const identity = myId; // তোমার আইডি
+
+            try {
+              // নিজেও টোকেন নিয়ে নিবে (এটাই ম্যাজিক লাইন)
+              const res = await fetch(
+                `/api/livekit/token?room=${roomName}&identity=${identity}`
+              );
+              const { token } = await res.json();
+
+              socket?.emit("call-accept", {
+                callerId: incomingCall.callerId,
+                roomName,
+              });
+
+              // সঠিক টোকেন দিয়ে কল ওপেন করো
+              setCallData({
+                roomName,
+                token, // এখানে "accepted" না, আসল টোকেন
+                isVideo: incomingCall.isVideo,
+              });
+
+              setIncomingCall(null);
+            } catch (err) {
+              alert("Failed to join call");
+            }
           }}
           onReject={() => {
             socket?.emit("call-reject", { callerId: incomingCall.callerId });

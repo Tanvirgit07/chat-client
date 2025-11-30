@@ -10,7 +10,7 @@ import {
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { X } from "lucide-react";
-import { Room, RoomConnectOptions, RoomOptions } from "livekit-client";  // এই import গুলো add করো (npm i livekit-client)
+import { Room, RoomConnectOptions, RoomOptions } from "livekit-client"; // এই import গুলো add করো (npm i livekit-client)
 import { useEffect, useMemo } from "react";
 
 interface CallModalProps {
@@ -29,12 +29,12 @@ export default function CallModal({
   // Room instance তৈরি + connect (এখানে roomName token এ include থাকবে backend থেকে)
   const room = useMemo(() => {
     const roomOptions: RoomOptions = {
-      adaptiveStream: true,  // optional: ভালো performance
+      adaptiveStream: true, // optional: ভালো performance
       dynacast: true,
     };
 
     const connectOptions: RoomConnectOptions = {
-      autoSubscribe: true,   // সব ট্র্যাক অটো subscribe
+      autoSubscribe: true, // সব ট্র্যাক অটো subscribe
     };
 
     const newRoom = new Room(roomOptions);
@@ -43,7 +43,7 @@ export default function CallModal({
       .then(() => console.log(`Connected to room: ${roomName}`))
       .catch((err) => {
         console.error("Connect failed:", err);
-        onClose();  // error এ modal close করো
+        onClose(); // error এ modal close করো
       });
 
     return newRoom;
@@ -67,10 +67,15 @@ export default function CallModal({
       </button>
 
       <LiveKitRoom
-        room={room} // Room instance (string না!)
-        video={isVideo}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
+        token={token}
+        connect={true}
         audio={true}
-        className="w-full h-full" serverUrl={undefined} token={undefined}      >
+        video={isVideo} // ← এটাই রাখো, কিন্তু নিচেরটা যোগ করো
+        connectOptions={{
+          autoSubscribe: true,
+        }}
+      >
         {isVideo ? <VideoConference /> : <AudioConference />}
       </LiveKitRoom>
     </div>
