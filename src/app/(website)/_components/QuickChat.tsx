@@ -23,17 +23,17 @@ const QuickChat: React.FC = () => {
   const [sharedMedia, setSharedMedia] = useState<string[]>([]);
   const [showProfile, setShowProfile] = useState(false);
   const [incomingCall, setIncomingCall] = useState<{
-  callerId: string;
-  callerName: string;
-  callerImage?: string;
-  roomName: string;
-  isVideo: boolean;
-} | null>(null);
-const [callData, setCallData] = useState<{
-  roomName: string;
-  token: string;
-  isVideo: boolean;
-} | null>(null);
+    callerId: string;
+    callerName: string;
+    callerImage?: string;
+    roomName: string;
+    isVideo: boolean;
+  } | null>(null);
+  const [callData, setCallData] = useState<{
+    roomName: string;
+    token: string;
+    isVideo: boolean;
+  } | null>(null);
 
   const { data: session, status } = useSession();
   // const queryClient = useQueryClient();
@@ -138,47 +138,48 @@ const [callData, setCallData] = useState<{
     },
   });
 
- 
-const socket = useSocket(
-  (message: ChatMessage) => {
-    if (
-      (message.senderId === selectedUser?.id && message.receiverId === myId) ||
-      (message.senderId === myId && message.receiverId === selectedUser?.id)
-    ) {
-      handleNewMessage(message);
-    }
-  },
-  (onlineIds: string[]) => setOnlineUsers(onlineIds),
-  (editedMessage: ChatMessage) => {
-    setMessages(prev =>
-      prev.map(m => m._id === editedMessage._id ? { ...editedMessage, edited: true } : m)
-    );
-  },
-  (data: any) => {
-    if (data.deletedForEveryone) {
-      setMessages(prev => prev.filter(m => m._id !== data.messageId));
-    } else if (data.deletedFor?.includes(myId)) {
-      setMessages(prev =>
-        prev.map(m =>
-          m._id === data.messageId
-            ? { ...m, deletedBy: [...(m.deletedBy || []), myId] }
-            : m
+  const socket = useSocket(
+   (message: ChatMessage) => {
+  console.log("Realtime message received:", message); // এই লগটা দেখো!
+
+  // শুধু আমার সাথে সম্পর্কিত মেসেজ গ্রহণ করো
+  if (message.senderId === myId || message.receiverId === myId) {
+    handleNewMessage(message);
+  }
+},
+    (onlineIds: string[]) => setOnlineUsers(onlineIds),
+    (editedMessage: ChatMessage) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === editedMessage._id ? { ...editedMessage, edited: true } : m
         )
       );
+    },
+    (data: any) => {
+      if (data.deletedForEveryone) {
+        setMessages((prev) => prev.filter((m) => m._id !== data.messageId));
+      } else if (data.deletedFor?.includes(myId)) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === data.messageId
+              ? { ...m, deletedBy: [...(m.deletedBy || []), myId] }
+              : m
+          )
+        );
+      }
+    },
+    // Incoming Call Listener ← এটা এখন কাজ করবে!
+    (data: any) => {
+      const caller = users.find((u) => u.id === data.callerId);
+      setIncomingCall({
+        callerId: data.callerId,
+        callerName: caller?.name || "Unknown",
+        callerImage: caller?.profileImage,
+        roomName: data.roomName,
+        isVideo: data.isVideo,
+      });
     }
-  },
-  // Incoming Call Listener ← এটা এখন কাজ করবে!
-  (data: any) => {
-    const caller = users.find(u => u.id === data.callerId);
-    setIncomingCall({
-      callerId: data.callerId,
-      callerName: caller?.name || "Unknown",
-      callerImage: caller?.profileImage,
-      roomName: data.roomName,
-      isVideo: data.isVideo,
-    });
-  }
-);
+  );
 
   // Users & Messages Update
   useEffect(() => {
@@ -210,25 +211,39 @@ const socket = useSocket(
     }
   }, [selectedUserData, myId]);
 
-  const handleNewMessage = (message: ChatMessage) => {
-    const isTemp = (id: string | undefined) => id?.startsWith("temp_");
 
-    setMessages((prev) => {
-      const exists = prev.some((m) => m._id === message._id);
-      if (exists) {
-        return prev.map((m) => (m._id === message._id ? message : m));
-      }
-      if (isTemp(message._id)) {
-        return [...prev, message];
-      }
-      // Replace temp message with real one
-      return prev.map((m) =>
-        isTemp(m._id) && m.text === message.text && m.image === message.image
-          ? message
-          : m
-      );
+
+const handleNewMessage = (message: ChatMessage) => {
+  if (message.senderId !== myId && message.receiverId !== myId) return;
+
+  setMessages((prev) => {
+    // আগে থেকে থাকলে রিপ্লেস
+    if (prev.some((m) => m._id === message._id)) {
+      return prev.map((m) => (m._id === message._id ? message : m));
+    }
+
+    // temp message খুঁজে বের করো — ইমেজ/ভয়েসের জন্য
+    const tempIndex = prev.findIndex((m) => {
+      if (!m._id?.startsWith("temp_")) return false;
+      if (m.messageType !== message.messageType) return false;
+
+      if (m.messageType === "text") return m.text === message.text;
+      if (m.messageType === "image") return !!m.image && !!message.image;
+      if (m.messageType === "voice") return m.voiceDuration === message.voiceDuration;
+
+      return false;
     });
-  };
+
+    if (tempIndex !== -1) {
+      const updated = [...prev];
+      updated[tempIndex] = message;
+      return updated;
+    }
+
+    return [...prev, message];
+  });
+};
+
 
   const messageActions = {
     onEdit: (id: string, text: string) =>
@@ -273,18 +288,18 @@ const socket = useSocket(
             <EmptyState />
           ) : (
             <ChatArea
-  selectedUser={selectedUser}
-  messages={messages}
-  myId={myId}
-  onMessageSent={handleNewMessage}
-  onBack={() => setSelectedUser(null)}
-  onProfileClick={() => setShowProfile(true)}
-  messageActions={messageActions}
-  socket={socket}
-  // এই দুইটা লাইন যোগ করো
-  callData={callData}
-  setCallData={setCallData}
-/>
+              selectedUser={selectedUser}
+              messages={messages}
+              myId={myId}
+              onMessageSent={handleNewMessage}
+              onBack={() => setSelectedUser(null)}
+              onProfileClick={() => setShowProfile(true)}
+              messageActions={messageActions}
+              socket={socket}
+              // এই দুইটা লাইন যোগ করো
+              callData={callData}
+              setCallData={setCallData}
+            />
           )}
         </div>
 
@@ -323,29 +338,29 @@ const socket = useSocket(
       </div>
 
       {/* Incoming Call Modal - সবার শেষে */}
-    {incomingCall && (
-      <IncomingCallModal
-        callerName={incomingCall.callerName}
-        callerImage={incomingCall.callerImage}
-        isVideo={incomingCall.isVideo}
-        onAccept={() => {
-          socket?.emit("call-accept", {
-            callerId: incomingCall.callerId,
-            roomName: incomingCall.roomName,
-          });
-          setCallData({
-            roomName: incomingCall.roomName,
-            token: "accepted",
-            isVideo: incomingCall.isVideo,
-          });
-          setIncomingCall(null);
-        }}
-        onReject={() => {
-          socket?.emit("call-reject", { callerId: incomingCall.callerId });
-          setIncomingCall(null);
-        }}
-      />
-    )}
+      {incomingCall && (
+        <IncomingCallModal
+          callerName={incomingCall.callerName}
+          callerImage={incomingCall.callerImage}
+          isVideo={incomingCall.isVideo}
+          onAccept={() => {
+            socket?.emit("call-accept", {
+              callerId: incomingCall.callerId,
+              roomName: incomingCall.roomName,
+            });
+            setCallData({
+              roomName: incomingCall.roomName,
+              token: "accepted",
+              isVideo: incomingCall.isVideo,
+            });
+            setIncomingCall(null);
+          }}
+          onReject={() => {
+            socket?.emit("call-reject", { callerId: incomingCall.callerId });
+            setIncomingCall(null);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -10,8 +10,8 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import Link from "next/link";
-import { User } from "./QuickChat";
 import { LogoutModal } from "@/components/Dialog/LogOutDialog";
+import { User } from "@/type";
 
 interface SidebarProps {
   users: User[];

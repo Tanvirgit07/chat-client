@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { User } from "./QuickChat";
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "lucide-react";
+import { User } from "@/type";
 
 interface ProfilePanelProps {
   selectedUser: User;

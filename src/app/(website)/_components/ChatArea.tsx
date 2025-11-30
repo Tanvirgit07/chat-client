@@ -195,54 +195,52 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     };
   };
 
-  // এই ফাংশনটা সবচেয়ে গুরুত্বপূর্ণ — এটাই ঠিক করা হয়েছে
-  const sendVoiceMessage = () => {
-    if (!recordedBlob || sendMessageMutation.isPending) return;
+const sendVoiceMessage = () => {
+  if (!recordedBlob || (window as any).isSending) {
+    console.log("Voice already sending...");
+    return;
+  }
 
-    const tempId = `temp_${Date.now()}_${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+  (window as any).isSending = true;
 
-    // Temp message for instant UI
-    const tempMessage: ChatMessage = {
-      _id: tempId,
-      senderId: myId,
-      receiverId: selectedUser.id,
-      messageType: "voice",
-      voice: URL.createObjectURL(recordedBlob),
-      voiceDuration: recordDuration,
-      createdAt: new Date().toISOString(),
-      seen: false,
-      replyTo: replyingTo?._id || null,
-      replyToText: replyingTo?.text || "",
-      replyToImage: replyingTo?.image || undefined,
-      replyToVoice: replyingTo?.voice || undefined,
-      replyToSenderName:
-        replyingTo?.senderId === myId ? "You" : selectedUser.name,
-    };
+  const tempId = `temp_voice_${Date.now()}`;
 
-    onMessageSent?.(tempMessage);
-
-    const formData = new FormData();
-    formData.append("voice", recordedBlob, "voice.webm"); // এই লাইনটা সবচেয়ে জরুরি
-    formData.append("messageType", "voice"); // এটাও দরকার (যদিও backend এ detect করে)
-    formData.append("voiceDuration", recordDuration.toString());
-
-    if (replyingTo) {
-      if (replyingTo._id && !replyingTo._id.startsWith("temp_")) {
-        formData.append("replyTo", replyingTo._id);
-      }
-      formData.append("replyToText", replyingTo.text || "");
-      if (replyingTo.image) formData.append("replyToImage", replyingTo.image);
-      if (replyingTo.voice) formData.append("replyToVoice", replyingTo.voice);
-      formData.append(
-        "replyToSenderName",
-        replyingTo.senderId === myId ? "You" : selectedUser.name
-      );
-    }
-
-    sendMessageMutation.mutate(formData);
+  const tempMessage: ChatMessage = {
+    _id: tempId,
+    senderId: myId,
+    receiverId: selectedUser.id,
+    messageType: "voice",
+    voice: URL.createObjectURL(recordedBlob),
+    voiceDuration: recordDuration,
+    createdAt: new Date().toISOString(),
+    seen: false,
+    replyTo: replyingTo?._id || null,
+    replyToText: replyingTo?.text || "",
+    replyToImage: replyingTo?.image || undefined,
+    replyToVoice: replyingTo?.voice || undefined,
+    replyToSenderName: replyingTo?.senderId === myId ? "You" : selectedUser.name,
   };
+
+  onMessageSent?.(tempMessage);
+
+  const formData = new FormData();
+  formData.append("voice", recordedBlob, `voice_${Date.now()}.webm`);
+  formData.append("voiceDuration", recordDuration.toString());
+
+  if (replyingTo?._id && !replyingTo._id.startsWith("temp_")) {
+    formData.append("replyTo", replyingTo._id);
+  }
+  if (replyingTo?.text) formData.append("replyToText", replyingTo.text || "");
+  if (replyingTo?.image) formData.append("replyToImage", replyingTo.image);
+  if (replyingTo?.voice) formData.append("replyToVoice", replyingTo.voice);
+  formData.append("replyToSenderName", replyingTo?.senderId === myId ? "You" : selectedUser.name);
+
+  sendMessageMutation.mutate(formData, {
+    onSettled: () => {
+      (window as any).isSending = false;
+    },
+  });
+};
 
   const cancelVoice = () => {
     setRecordedBlob(null);
@@ -250,54 +248,57 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     setRecordDuration(0);
   };
 
-  const handleSend = () => {
-    if (
-      (!text.trim() && selectedFiles.length === 0) ||
-      sendMessageMutation.isPending
-    )
-      return;
+  
+const handleSend = () => {
+ 
+  
+  if ((window as any).isSending) {
+    console.log("Already sending... blocked");
+    return;
+  }
 
-    const tempId = `temp_${Date.now()}_${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+  if (!text.trim() && selectedFiles.length === 0) return;
 
-    const tempMessage: ChatMessage = {
-      _id: tempId,
-      senderId: myId,
-      receiverId: selectedUser.id,
-      messageType: selectedFiles.length > 0 ? "image" : "text",
-      text: text || undefined,
-      image: selectedFiles[0]
-        ? URL.createObjectURL(selectedFiles[0])
-        : undefined,
-      createdAt: new Date().toISOString(),
-      seen: false,
-      replyTo: replyingTo?._id || null,
-      replyToText: replyingTo?.text || "",
-      replyToImage: replyingTo?.image || undefined,
-      replyToSenderName:
-        replyingTo?.senderId === myId ? "You" : selectedUser.name,
-    };
+  // ফ্ল্যাগ সেট করো
+  (window as any).isSending = true;
 
-    onMessageSent?.(tempMessage);
+  const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const formData = new FormData();
-    if (text.trim()) formData.append("text", text.trim());
-    if (selectedFiles[0]) formData.append("image", selectedFiles[0]);
-
-    if (replyingTo) {
-      if (replyingTo._id && !replyingTo._id.startsWith("temp_"))
-        formData.append("replyTo", replyingTo._id);
-      formData.append("replyToText", replyingTo.text || "");
-      if (replyingTo.image) formData.append("replyToImage", replyingTo.image);
-      formData.append(
-        "replyToSenderName",
-        replyingTo.senderId === myId ? "You" : selectedUser.name
-      );
-    }
-
-    sendMessageMutation.mutate(formData);
+  const tempMessage: ChatMessage = {
+    _id: tempId,
+    senderId: myId,
+    receiverId: selectedUser.id,
+    messageType: selectedFiles.length > 0 ? "image" : "text",
+    text: text || undefined,
+    image: selectedFiles[0] ? URL.createObjectURL(selectedFiles[0]) : undefined,
+    createdAt: new Date().toISOString(),
+    seen: false,
+    replyTo: replyingTo?._id || null,
+    replyToText: replyingTo?.text || "",
+    replyToImage: replyingTo?.image || undefined,
+    replyToSenderName: replyingTo?.senderId === myId ? "You" : selectedUser.name,
   };
+
+  onMessageSent?.(tempMessage);
+
+  const formData = new FormData();
+  if (text.trim()) formData.append("text", text.trim());
+  if (selectedFiles[0]) formData.append("image", selectedFiles[0]);
+
+  if (replyingTo?._id && !replyingTo._id.startsWith("temp_")) {
+    formData.append("replyTo", replyingTo._id);
+  }
+  if (replyingTo?.text) formData.append("replyToText", replyingTo.text || "");
+  if (replyingTo?.image) formData.append("replyToImage", replyingTo.image);
+  formData.append("replyToSenderName", replyingTo?.senderId === myId ? "You" : selectedUser.name);
+
+  sendMessageMutation.mutate(formData, {
+    onSettled: () => {
+      // সেন্ড শেষ হলে ফ্ল্যাগ রিসেট করো
+      (window as any).isSending = false;
+    },
+  });
+};
 
   const handleEdit = () => {
     if (!editText.trim() || !editingMessageId) return;
