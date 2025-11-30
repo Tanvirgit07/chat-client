@@ -48,7 +48,13 @@ export interface ChatAreaProps {
   };
   socket: any;
   callData: { roomName: string; token: string; isVideo: boolean } | null;
-  setCallData: React.Dispatch<React.SetStateAction<{ roomName: string; token: string; isVideo: boolean } | null>>;
+  setCallData: React.Dispatch<
+    React.SetStateAction<{
+      roomName: string;
+      token: string;
+      isVideo: boolean;
+    } | null>
+  >;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -59,7 +65,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   onBack,
   onProfileClick,
   messageActions,
-  socket,   // ← এই লাইনটা যোগ করো!
+  socket, // ← এই লাইনটা যোগ করো!
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -121,45 +127,44 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // ChatArea.tsx এর ভিতরে startCall ফাংশনটা পুরোটা মুছে এইটা বসাও
   const startCall = async (isVideo: boolean) => {
     if (!selectedUser?.id) return;
 
+    const roomName = `room_${myId}_${selectedUser.id}_${Date.now()}`;
+    const identity = myId;
+
     try {
-      const res = await fetch("http://localhost:5000/api/v1/call/create-room", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${TOKEN}`,
-        },
-        body: JSON.stringify({ receiverId: selectedUser.id }),
+      // এখন আর Render-এ যাবে না → Vercel-এর নিজের API থেকে টোকেন নিবে
+      const res = await fetch(
+        `/api/livekit/token?room=${roomName}&identity=${identity}`
+      );
+      const { token } = await res.json();
+
+      if (!token) {
+        alert("Failed to get call token!");
+        return;
+      }
+
+      // Socket-এ কল রিকোয়েস্ট পাঠাও
+      socket?.emit("call-request", {
+        callerId: myId,
+        receiverId: selectedUser.id,
+        roomName,
+        isVideo,
       });
 
-      const data = await res.json();
-
-      if (data.success) {
-        // Socket দিয়ে রিসিভারকে জানাও
-        socket?.emit("call-request", {
-          callerId: myId,
-          receiverId: selectedUser.id,
-          roomName: data.roomName,
-          isVideo,
-        });
-
-        // নিজের কাছে কল ওপেন করো
-        setCallData({
-          roomName: data.roomName,
-          token: data.token,
-          isVideo,
-        });
-      } else {
-        alert("Call failed!");
-      }
-    } catch (err: any) {
-  console.error(err);
-  alert("Call connection failed!");
-}
+      // নিজের কাছে কল ওপেন করো
+      setCallData({
+        roomName,
+        token,
+        isVideo,
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Call connection failed!");
+    }
   };
-
   // Voice Recording Functions
   const startRecording = async () => {
     try {
@@ -195,52 +200,56 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     };
   };
 
-const sendVoiceMessage = () => {
-  if (!recordedBlob || (window as any).isSending) {
-    console.log("Voice already sending...");
-    return;
-  }
+  const sendVoiceMessage = () => {
+    if (!recordedBlob || (window as any).isSending) {
+      console.log("Voice already sending...");
+      return;
+    }
 
-  (window as any).isSending = true;
+    (window as any).isSending = true;
 
-  const tempId = `temp_voice_${Date.now()}`;
+    const tempId = `temp_voice_${Date.now()}`;
 
-  const tempMessage: ChatMessage = {
-    _id: tempId,
-    senderId: myId,
-    receiverId: selectedUser.id,
-    messageType: "voice",
-    voice: URL.createObjectURL(recordedBlob),
-    voiceDuration: recordDuration,
-    createdAt: new Date().toISOString(),
-    seen: false,
-    replyTo: replyingTo?._id || null,
-    replyToText: replyingTo?.text || "",
-    replyToImage: replyingTo?.image || undefined,
-    replyToVoice: replyingTo?.voice || undefined,
-    replyToSenderName: replyingTo?.senderId === myId ? "You" : selectedUser.name,
+    const tempMessage: ChatMessage = {
+      _id: tempId,
+      senderId: myId,
+      receiverId: selectedUser.id,
+      messageType: "voice",
+      voice: URL.createObjectURL(recordedBlob),
+      voiceDuration: recordDuration,
+      createdAt: new Date().toISOString(),
+      seen: false,
+      replyTo: replyingTo?._id || null,
+      replyToText: replyingTo?.text || "",
+      replyToImage: replyingTo?.image || undefined,
+      replyToVoice: replyingTo?.voice || undefined,
+      replyToSenderName:
+        replyingTo?.senderId === myId ? "You" : selectedUser.name,
+    };
+
+    onMessageSent?.(tempMessage);
+
+    const formData = new FormData();
+    formData.append("voice", recordedBlob, `voice_${Date.now()}.webm`);
+    formData.append("voiceDuration", recordDuration.toString());
+
+    if (replyingTo?._id && !replyingTo._id.startsWith("temp_")) {
+      formData.append("replyTo", replyingTo._id);
+    }
+    if (replyingTo?.text) formData.append("replyToText", replyingTo.text || "");
+    if (replyingTo?.image) formData.append("replyToImage", replyingTo.image);
+    if (replyingTo?.voice) formData.append("replyToVoice", replyingTo.voice);
+    formData.append(
+      "replyToSenderName",
+      replyingTo?.senderId === myId ? "You" : selectedUser.name
+    );
+
+    sendMessageMutation.mutate(formData, {
+      onSettled: () => {
+        (window as any).isSending = false;
+      },
+    });
   };
-
-  onMessageSent?.(tempMessage);
-
-  const formData = new FormData();
-  formData.append("voice", recordedBlob, `voice_${Date.now()}.webm`);
-  formData.append("voiceDuration", recordDuration.toString());
-
-  if (replyingTo?._id && !replyingTo._id.startsWith("temp_")) {
-    formData.append("replyTo", replyingTo._id);
-  }
-  if (replyingTo?.text) formData.append("replyToText", replyingTo.text || "");
-  if (replyingTo?.image) formData.append("replyToImage", replyingTo.image);
-  if (replyingTo?.voice) formData.append("replyToVoice", replyingTo.voice);
-  formData.append("replyToSenderName", replyingTo?.senderId === myId ? "You" : selectedUser.name);
-
-  sendMessageMutation.mutate(formData, {
-    onSettled: () => {
-      (window as any).isSending = false;
-    },
-  });
-};
 
   const cancelVoice = () => {
     setRecordedBlob(null);
@@ -248,57 +257,62 @@ const sendVoiceMessage = () => {
     setRecordDuration(0);
   };
 
-  
-const handleSend = () => {
- 
-  
-  if ((window as any).isSending) {
-    console.log("Already sending... blocked");
-    return;
-  }
+  const handleSend = () => {
+    if ((window as any).isSending) {
+      console.log("Already sending... blocked");
+      return;
+    }
 
-  if (!text.trim() && selectedFiles.length === 0) return;
+    if (!text.trim() && selectedFiles.length === 0) return;
 
-  // ফ্ল্যাগ সেট করো
-  (window as any).isSending = true;
+    // ফ্ল্যাগ সেট করো
+    (window as any).isSending = true;
 
-  const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const tempId = `temp_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
 
-  const tempMessage: ChatMessage = {
-    _id: tempId,
-    senderId: myId,
-    receiverId: selectedUser.id,
-    messageType: selectedFiles.length > 0 ? "image" : "text",
-    text: text || undefined,
-    image: selectedFiles[0] ? URL.createObjectURL(selectedFiles[0]) : undefined,
-    createdAt: new Date().toISOString(),
-    seen: false,
-    replyTo: replyingTo?._id || null,
-    replyToText: replyingTo?.text || "",
-    replyToImage: replyingTo?.image || undefined,
-    replyToSenderName: replyingTo?.senderId === myId ? "You" : selectedUser.name,
+    const tempMessage: ChatMessage = {
+      _id: tempId,
+      senderId: myId,
+      receiverId: selectedUser.id,
+      messageType: selectedFiles.length > 0 ? "image" : "text",
+      text: text || undefined,
+      image: selectedFiles[0]
+        ? URL.createObjectURL(selectedFiles[0])
+        : undefined,
+      createdAt: new Date().toISOString(),
+      seen: false,
+      replyTo: replyingTo?._id || null,
+      replyToText: replyingTo?.text || "",
+      replyToImage: replyingTo?.image || undefined,
+      replyToSenderName:
+        replyingTo?.senderId === myId ? "You" : selectedUser.name,
+    };
+
+    onMessageSent?.(tempMessage);
+
+    const formData = new FormData();
+    if (text.trim()) formData.append("text", text.trim());
+    if (selectedFiles[0]) formData.append("image", selectedFiles[0]);
+
+    if (replyingTo?._id && !replyingTo._id.startsWith("temp_")) {
+      formData.append("replyTo", replyingTo._id);
+    }
+    if (replyingTo?.text) formData.append("replyToText", replyingTo.text || "");
+    if (replyingTo?.image) formData.append("replyToImage", replyingTo.image);
+    formData.append(
+      "replyToSenderName",
+      replyingTo?.senderId === myId ? "You" : selectedUser.name
+    );
+
+    sendMessageMutation.mutate(formData, {
+      onSettled: () => {
+        // সেন্ড শেষ হলে ফ্ল্যাগ রিসেট করো
+        (window as any).isSending = false;
+      },
+    });
   };
-
-  onMessageSent?.(tempMessage);
-
-  const formData = new FormData();
-  if (text.trim()) formData.append("text", text.trim());
-  if (selectedFiles[0]) formData.append("image", selectedFiles[0]);
-
-  if (replyingTo?._id && !replyingTo._id.startsWith("temp_")) {
-    formData.append("replyTo", replyingTo._id);
-  }
-  if (replyingTo?.text) formData.append("replyToText", replyingTo.text || "");
-  if (replyingTo?.image) formData.append("replyToImage", replyingTo.image);
-  formData.append("replyToSenderName", replyingTo?.senderId === myId ? "You" : selectedUser.name);
-
-  sendMessageMutation.mutate(formData, {
-    onSettled: () => {
-      // সেন্ড শেষ হলে ফ্ল্যাগ রিসেট করো
-      (window as any).isSending = false;
-    },
-  });
-};
 
   const handleEdit = () => {
     if (!editText.trim() || !editingMessageId) return;
