@@ -1,6 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 // lib/socketIoConnection.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -10,15 +10,16 @@ import { ChatMessage } from "@/type";
 
 type MessageEditedHandler = (message: ChatMessage) => void;
 type MessageDeletedHandler = (data: { messageId: string; deletedFor?: string[]; deletedForEveryone?: boolean }) => void;
+type IncomingCallHandler = (data: { callerId: string; roomName: string; isVideo: boolean }) => void; // নতুন
 
-// গ্লোবাল সকেট — একবারই তৈরি হবে
 let globalSocket: Socket | null = null;
 
 export default function useSocket(
   onNewMessage?: (message: ChatMessage) => void,
   onOnlineUsers?: (users: string[]) => void,
   onMessageEdited?: MessageEditedHandler,
-  onMessageDeleted?: MessageDeletedHandler
+  onMessageDeleted?: MessageDeletedHandler,
+  onIncomingCall?: IncomingCallHandler // ৫ম কলব্যাক যোগ হলো
 ) {
   const { data: session, status } = useSession();
   const callbacks = useRef({
@@ -26,15 +27,17 @@ export default function useSocket(
     onOnlineUsers,
     onMessageEdited,
     onMessageDeleted,
+    onIncomingCall, // নতুন
   }).current;
 
-  // কলব্যাক আপডেট করো
+  // কলব্যাক আপডেট
   useEffect(() => {
     callbacks.onNewMessage = onNewMessage;
     callbacks.onOnlineUsers = onOnlineUsers;
     callbacks.onMessageEdited = onMessageEdited;
     callbacks.onMessageDeleted = onMessageDeleted;
-  }, [onNewMessage, onOnlineUsers, onMessageEdited, onMessageDeleted]);
+    callbacks.onIncomingCall = onIncomingCall; // নতুন
+  }, [onNewMessage, onOnlineUsers, onMessageEdited, onMessageDeleted, onIncomingCall]);
 
   useEffect(() => {
     if (status !== "authenticated" || !session) {
@@ -51,18 +54,15 @@ export default function useSocket(
 
     const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL as string;
 
-    // যদি আগে থেকে সকেট থাকে এবং সেইম ইউজার, তাহলে রি-ইউজ করো
     if (globalSocket?.connected && (globalSocket.io.opts.query as any)?.userId === userId) {
       return;
     }
 
-    // পুরানো সকেট থাকলে ক্লিন করো
     if (globalSocket) {
       globalSocket.off();
       globalSocket.disconnect();
     }
 
-    // নতুন সকেট তৈরি
     globalSocket = io(SOCKET_URL, {
       query: { userId },
       transports: ["websocket"],
@@ -78,10 +78,14 @@ export default function useSocket(
       console.log("Socket Disconnected:", reason);
     });
 
+    // সব লিসেনার এখানে
     globalSocket.on("getOnlineUsers", (users: string[]) => callbacks.onOnlineUsers?.(users));
     globalSocket.on("newMessage", (msg: ChatMessage) => callbacks.onNewMessage?.(msg));
     globalSocket.on("messageEdited", (msg: ChatMessage) => callbacks.onMessageEdited?.(msg));
     globalSocket.on("messageDeleted", (data: any) => callbacks.onMessageDeleted?.(data));
+    
+    // এইটা নতুন — ব্যাকেন্ড থেকে "call-request" আসলে চলবে
+    globalSocket.on("call-request", (data: any) => callbacks.onIncomingCall?.(data));
 
   }, [status, session]);
 

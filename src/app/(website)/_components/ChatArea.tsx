@@ -14,11 +14,13 @@ import {
   Trash2,
   Users,
   Reply,
-  User,
+  CircleUser,
   Mic,
   Volume2,
+  Phone,
+  Video,
 } from "lucide-react";
-import { User as UserType, ChatMessage } from "./QuickChat";
+import { User, ChatMessage } from "@/type";
 import Image from "next/image";
 import { useMutation } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -30,19 +32,23 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import CallModal from "@/components/Dialog/CallModal";
 
-interface ChatAreaProps {
-  selectedUser: UserType;
+export interface ChatAreaProps {
+  selectedUser: User;
   messages: ChatMessage[];
   myId: string;
-  onMessageSent?: (message: ChatMessage) => void;
-  onBack?: () => void;
-  onProfileClick?: () => void;
-  messageActions?: {
-    onEdit: (messageId: string, newText: string) => void;
-    onDeleteForMe: (messageId: string) => void;
-    onDeleteForEveryone: (messageId: string) => void;
+  onMessageSent: (message: ChatMessage) => void;
+  onBack: () => void;
+  onProfileClick: () => void;
+  messageActions: {
+    onEdit: (id: string, text: string) => void;
+    onDeleteForMe: (id: string) => void;
+    onDeleteForEveryone: (id: string) => void;
   };
+  socket: any;
+  callData: { roomName: string; token: string; isVideo: boolean } | null;
+  setCallData: React.Dispatch<React.SetStateAction<{ roomName: string; token: string; isVideo: boolean } | null>>;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -53,6 +59,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   onBack,
   onProfileClick,
   messageActions,
+  socket,   // ← এই লাইনটা যোগ করো!
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -64,6 +71,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+
+  const [callData, setCallData] = useState<{
+    roomName: string;
+    token: string;
+    isVideo: boolean;
+  } | null>(null);
 
   // Voice Recording
   const [isRecording, setIsRecording] = useState(false);
@@ -106,6 +119,45 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     setIsRecording(false);
     setRecordDuration(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const startCall = async (isVideo: boolean) => {
+    if (!selectedUser?.id) return;
+
+    try {
+      const res = await fetch("http://localhost:5000/api/v1/call/create-room", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TOKEN}`,
+        },
+        body: JSON.stringify({ receiverId: selectedUser.id }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Socket দিয়ে রিসিভারকে জানাও
+        socket?.emit("call-request", {
+          callerId: myId,
+          receiverId: selectedUser.id,
+          roomName: data.roomName,
+          isVideo,
+        });
+
+        // নিজের কাছে কল ওপেন করো
+        setCallData({
+          roomName: data.roomName,
+          token: data.token,
+          isVideo,
+        });
+      } else {
+        alert("Call failed!");
+      }
+    } catch (err: any) {
+  console.error(err);
+  alert("Call connection failed!");
+}
   };
 
   // Voice Recording Functions
@@ -318,8 +370,27 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Video + Audio Call Buttons */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => startCall(false)}
+              className="text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
+              title="Audio Call"
+            >
+              <Phone size={24} />
+            </button>
+            <button
+              onClick={() => startCall(true)}
+              className="text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
+              title="Video Call"
+            >
+              <Video size={24} />
+            </button>
+          </div>
+
           <button onClick={onProfileClick} className="text-white ml-2">
-            <User size={26} />
+            <CircleUser size={26} />
           </button>
         </div>
       </div>
@@ -684,95 +755,100 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               <ImageIcon size={21} className="text-white" />
             </button>
 
-           {/* Emoji Button + Fully Responsive Picker */}
-<div className="relative flex-shrink-0">
-  <button
-    onClick={() => setShowEmoji(prev => !prev)}
-    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95"
-  >
-    <Smile size={21} className="text-white" />
-  </button>
+            {/* Emoji Button + Fully Responsive Picker */}
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setShowEmoji((prev) => !prev)}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-full p-3 shadow-xl transition-all hover:scale-110 active:scale-95"
+              >
+                <Smile size={21} className="text-white" />
+              </button>
 
-  {/* Magic: 100% Responsive Emoji Picker for ALL Devices */}
-  {showEmoji && (
-    <>
-      {/* Mobile & Tablet: Full Bottom Sheet */}
-      <div className="fixed inset-0 z-[60] flex items-end justify-center sm:hidden">
-        <div
-          className="w-full max-w-md bg-gray-900 rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <h3 className="text-lg font-semibold text-white">Choose Emoji</h3>
-            <button
-              onClick={() => setShowEmoji(false)}
-              className="text-white/70 hover:text-white p-2"
-            >
-              <X size={26} />
-            </button>
-          </div>
+              {/* Magic: 100% Responsive Emoji Picker for ALL Devices */}
+              {showEmoji && (
+                <>
+                  {/* Mobile & Tablet: Full Bottom Sheet */}
+                  <div className="fixed inset-0 z-[60] flex items-end justify-center sm:hidden">
+                    <div
+                      className="w-full max-w-md bg-gray-900 rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between p-4 border-b border-white/10">
+                        <h3 className="text-lg font-semibold text-white">
+                          Choose Emoji
+                        </h3>
+                        <button
+                          onClick={() => setShowEmoji(false)}
+                          className="text-white/70 hover:text-white p-2"
+                        >
+                          <X size={26} />
+                        </button>
+                      </div>
 
-          {/* Picker */}
-          <div className="h-96">
-            <EmojiPicker
-              onEmojiClick={(e) => {
-                const emoji = e.emoji;
-                if (editingMessageId) {
-                  setEditText(prev => prev + emoji);
-                } else {
-                  setText(prev => prev + emoji);
-                }
-                inputRef.current?.focus();
-                // মোবাইলে ইমোজি বেছে নিলেও পিকার বন্ধ হবে না (WhatsApp এর মতো)
-              }}
-              theme={Theme.DARK}
-              width="100%"
-              height="100%"
-              lazyLoadEmojis={true}
-              previewConfig={{ showPreview: false }}
-              skinTonesDisabled={false}
-            />
-          </div>
-        </div>
+                      {/* Picker */}
+                      <div className="h-96">
+                        <EmojiPicker
+                          onEmojiClick={(e) => {
+                            const emoji = e.emoji;
+                            if (editingMessageId) {
+                              setEditText((prev) => prev + emoji);
+                            } else {
+                              setText((prev) => prev + emoji);
+                            }
+                            inputRef.current?.focus();
+                            // মোবাইলে ইমোজি বেছে নিলেও পিকার বন্ধ হবে না (WhatsApp এর মতো)
+                          }}
+                          theme={Theme.DARK}
+                          width="100%"
+                          height="100%"
+                          lazyLoadEmojis={true}
+                          previewConfig={{ showPreview: false }}
+                          skinTonesDisabled={false}
+                        />
+                      </div>
+                    </div>
 
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/60"
-          onClick={() => setShowEmoji(false)}
-        />
-      </div>
+                    {/* Backdrop */}
+                    <div
+                      className="absolute inset-0 bg-black/60"
+                      onClick={() => setShowEmoji(false)}
+                    />
+                  </div>
 
-      {/* Desktop & Large Screens: Floating Picker (আগের মতোই কিন্তু আরো সুন্দর) */}
-      <div className="hidden sm:block absolute bottom-16 left-1/2 -translate-x-1/2 z-50">
-        <div className="bg-gray-900/95 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between p-3 border-b border-white/10">
-            <span className="text-sm font-medium text-white/80">Emojis</span>
-            <button
-              onClick={() => setShowEmoji(false)}
-              className="text-white/60 hover:text-white p-1"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <EmojiPicker
-            onEmojiClick={(e) => {
-              const emoji = e.emoji;
-              if (editingMessageId) setEditText(prev => prev + emoji);
-              else setText(prev => prev + emoji);
-              inputRef.current?.focus();
-            }}
-            theme={Theme.DARK}
-            width={350}
-            height={400}
-            lazyLoadEmojis={true}
-            previewConfig={{ showPreview: false }}
-          />
-        </div>
-      </div>
-    </>
-  )}
-</div>
+                  {/* Desktop & Large Screens: Floating Picker (আগের মতোই কিন্তু আরো সুন্দর) */}
+                  <div className="hidden sm:block absolute bottom-16 left-1/2 -translate-x-1/2 z-50">
+                    <div className="bg-gray-900/95 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                      <div className="flex items-center justify-between p-3 border-b border-white/10">
+                        <span className="text-sm font-medium text-white/80">
+                          Emojis
+                        </span>
+                        <button
+                          onClick={() => setShowEmoji(false)}
+                          className="text-white/60 hover:text-white p-1"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      <EmojiPicker
+                        onEmojiClick={(e) => {
+                          const emoji = e.emoji;
+                          if (editingMessageId)
+                            setEditText((prev) => prev + emoji);
+                          else setText((prev) => prev + emoji);
+                          inputRef.current?.focus();
+                        }}
+                        theme={Theme.DARK}
+                        width={350}
+                        height={400}
+                        lazyLoadEmojis={true}
+                        previewConfig={{ showPreview: false }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Mic Button */}
             {!editingMessageId && !recordedBlob && (
@@ -847,6 +923,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         </div>
       </div>
+
+      {callData && (
+        <CallModal
+          roomName={callData.roomName}
+          token={callData.token}
+          isVideo={callData.isVideo}
+          onClose={() => setCallData(null)}
+        />
+      )}
     </div>
   );
 };
