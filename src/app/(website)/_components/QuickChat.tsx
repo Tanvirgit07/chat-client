@@ -343,33 +343,29 @@ const QuickChat: React.FC = () => {
           callerImage={incomingCall.callerImage}
           isVideo={incomingCall.isVideo}
           onAccept={async () => {
-            const roomName = incomingCall.roomName;
-            const identity = myId; // তোমার আইডি
+  // এখানে আসল রুম নাম আসবে (caller পাঠিয়েছে)
+  const roomName = incomingCall.roomName;
+  const identity = myId;
 
-            try {
-              // নিজেও টোকেন নিয়ে নিবে (এটাই ম্যাজিক লাইন)
-              const res = await fetch(
-                `/api/livekit/token?room=${roomName}&identity=${identity}`
-              );
-              const { token } = await res.json();
+  try {
+    const res = await fetch(
+      `/api/livekit/token?room=${roomName}&identity=${identity}`
+    );
+    const { token } = await res.json();
 
-              socket?.emit("call-accept", {
-                callerId: incomingCall.callerId,
-                roomName,
-              });
+    if (!token) throw new Error("No token");
 
-              // সঠিক টোকেন দিয়ে কল ওপেন করো
-              setCallData({
-                roomName,
-                token, // এখানে "accepted" না, আসল টোকেন
-                isVideo: incomingCall.isVideo,
-              });
+    socket?.emit("call-accept", {
+      callerId: incomingCall.callerId,
+      roomName,
+    });
 
-              setIncomingCall(null);
-            } catch (err) {
-              alert("Failed to join call");
-            }
-          }}
+    setCallData({ roomName, token, isVideo: incomingCall.isVideo });
+    setIncomingCall(null);
+  } catch (err) {
+    alert("কল জয়েন করতে পারিনি");
+  }
+}}
           onReject={() => {
             socket?.emit("call-reject", { callerId: incomingCall.callerId });
             setIncomingCall(null);

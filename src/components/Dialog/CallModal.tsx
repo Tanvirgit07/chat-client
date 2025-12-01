@@ -1,17 +1,15 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-// frontend/components/Dialog/CallModal.tsx
-
+// components/Dialog/CallModal.tsx
 "use client";
 
 import {
   LiveKitRoom,
   VideoConference,
   AudioConference,
+  RoomAudioRenderer,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { X } from "lucide-react";
-import { Room, RoomConnectOptions, RoomOptions } from "livekit-client"; // এই import গুলো add করো (npm i livekit-client)
-import { useEffect, useMemo } from "react";
+import { useEffect, useRef } from "react";
 
 interface CallModalProps {
   roomName: string;
@@ -20,62 +18,50 @@ interface CallModalProps {
   onClose: () => void;
 }
 
-export default function CallModal({
-  roomName,
-  token,
-  isVideo,
-  onClose,
-}: CallModalProps) {
-  // Room instance তৈরি + connect (এখানে roomName token এ include থাকবে backend থেকে)
-  const room = useMemo(() => {
-    const roomOptions: RoomOptions = {
-      adaptiveStream: true, // optional: ভালো performance
-      dynacast: true,
-    };
+export default function CallModal({ token, isVideo, onClose }: CallModalProps) {
+  const triggered = useRef(false);
 
-    const connectOptions: RoomConnectOptions = {
-      autoSubscribe: true, // সব ট্র্যাক অটো subscribe
-    };
-
-    const newRoom = new Room(roomOptions);
-    newRoom
-      .connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, token, connectOptions)
-      .then(() => console.log(`Connected to room: ${roomName}`))
-      .catch((err) => {
-        console.error("Connect failed:", err);
-        onClose(); // error এ modal close করো
-      });
-
-    return newRoom;
-  }, [token, roomName]);
-
-  // Cleanup: disconnect on unmount
+  // এই useEffect টা ১০০% মাইক পারমিশন ট্রিগার করবে — রিসিভারেরও!
   useEffect(() => {
-    return () => {
-      room?.disconnect();
+    if (triggered.current) return;
+    triggered.current = true;
+
+    const forceMic = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: true,
+          video: isVideo 
+        });
+        // stream টা আমরা ব্যবহার করবো না, শুধু পারমিশন নেওয়ার জন্য
+        stream.getTracks().forEach(track => track.stop());
+      } catch (err) {
+        console.log("Mic permission requested (user may deny)", err);
+      }
     };
-  }, [room]);
+
+    // ৫০০ms পর ট্রিগার করি যাতে মডাল পুরোপুরি ওপেন হয়
+    const timer = setTimeout(forceMic, 500);
+    return () => clearTimeout(timer);
+  }, [isVideo]);
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black">
       <button
         onClick={onClose}
-        className="absolute top-5 left-5 z-50 bg-black/70 hover:bg-black/90 text-white p-3 rounded-full transition-colors"
-        aria-label="Close call"
+        className="absolute top-6 left-6 z-50 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-2xl"
       >
-        <X size={32} />
+        <X size={36} />
       </button>
 
       <LiveKitRoom
-        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         token={token}
         connect={true}
         audio={true}
-        video={isVideo} // ← এটাই রাখো, কিন্তু নিচেরটা যোগ করো
-        connectOptions={{
-          autoSubscribe: true,
-        }}
+        video={isVideo}
+        connectOptions={{ autoSubscribe: true }}
       >
+        <RoomAudioRenderer />
         {isVideo ? <VideoConference /> : <AudioConference />}
       </LiveKitRoom>
     </div>

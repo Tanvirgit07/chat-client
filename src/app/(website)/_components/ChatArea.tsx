@@ -128,43 +128,43 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   // ChatArea.tsx এর ভিতরে startCall ফাংশনটা পুরোটা মুছে এইটা বসাও
-  const startCall = async (isVideo: boolean) => {
-    if (!selectedUser?.id) return;
+const startCall = async (isVideo: boolean) => {
+  if (!selectedUser?.id) return;
 
-    const roomName = `room_${myId}_${selectedUser.id}_${Date.now()}`;
-    const identity = myId;
+  // একই রুম নাম দুইজনের জন্যই (সর্ট করে নিচ্ছি যাতে দুইজনের একই হয়)
+  const participants = [myId, selectedUser.id].sort();
+  const roomName = `call_${participants[0]}_${participants[1]}`;
 
-    try {
-      // এখন আর Render-এ যাবে না → Vercel-এর নিজের API থেকে টোকেন নিবে
-      const res = await fetch(
-        `/api/livekit/token?room=${roomName}&identity=${identity}`
-      );
-      const { token } = await res.json();
+  const identity = myId;
 
-      if (!token) {
-        alert("Failed to get call token!");
-        return;
-      }
+  try {
+    const res = await fetch(
+      `/api/livekit/token?room=${roomName}&identity=${identity}`
+    );
+    const { token } = await res.json();
 
-      // Socket-এ কল রিকোয়েস্ট পাঠাও
-      socket?.emit("call-request", {
-        callerId: myId,
-        receiverId: selectedUser.id,
-        roomName,
-        isVideo,
-      });
-
-      // নিজের কাছে কল ওপেন করো
-      setCallData({
-        roomName,
-        token,
-        isVideo,
-      });
-    } catch (err) {
-      console.error(err);
-      alert("Call connection failed!");
+    if (!token) {
+      alert("Failed to get call token!");
+      return;
     }
-  };
+
+    // কল রিকোয়েস্ট পাঠাও (রুম নাম সহ)
+    socket?.emit("call-request", {
+      callerId: myId,
+      receiverId: selectedUser.id,
+      roomName,       // এখানে একই রুম নাম
+      isVideo,
+    });
+
+    // নিজেও একই রুমে জয়েন করো
+    setCallData({ roomName, token, isVideo });
+  } catch (err) {
+    console.error(err);
+    alert("Call failed");
+  }
+};
+
+
   // Voice Recording Functions
   const startRecording = async () => {
     try {
