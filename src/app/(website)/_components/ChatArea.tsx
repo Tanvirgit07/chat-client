@@ -347,66 +347,86 @@ const startCall = async (isVideo: boolean) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-900/30">
-      {/* Header */}
-      <div className="bg-black/40 backdrop-blur-xl border-b border-purple-500/20 z-10">
-        <div className="flex items-center justify-between px-3 py-3 sm:px-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <button
-              onClick={onBack}
-              className="lg:hidden text-white flex-shrink-0"
-            >
-              <ArrowLeft size={26} />
-            </button>
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600 flex-shrink-0">
-              {selectedUser.profileImage ? (
-                <Image
-                  width={40}
-                  height={40}
-                  src={selectedUser.profileImage}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-white font-bold text-lg flex items-center justify-center w-full h-full">
-                  {getInitials(selectedUser.name)}
-                </span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-white font-medium text-base truncate">
-                {selectedUser.name}
-              </h3>
-              <p className="text-green-400 text-xs">
-                {selectedUser.status === "Online"
-                  ? "Online"
-                  : "Last seen recently"}
-              </p>
-            </div>
-          </div>
+      {/* ========== PREMIUM HEADER - শুধু এই পার্টটা রিপ্লেস করো ========== */}
+<div className="bg-gradient-to-b from-purple-900/30 via-black/70 to-black/90 backdrop-blur-2xl border-b border-purple-500/20 z-50 shadow-2xl sticky top-0">
+  <div className="flex items-center justify-between px-4 py-4">
+    {/* Left Side - Back + Avatar + Name */}
+    <div className="flex items-center gap-3 flex-1 min-w-0">
+      {/* Mobile Back Button */}
+      <button
+        onClick={onBack}
+        className="lg:hidden text-white/90 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
+      >
+        <ArrowLeft size={26} />
+      </button>
 
-          {/* Video + Audio Call Buttons */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => startCall(false)}
-              className="text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
-              title="Audio Call"
-            >
-              <Phone size={24} />
-            </button>
-            <button
-              onClick={() => startCall(true)}
-              className="text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
-              title="Video Call"
-            >
-              <Video size={24} />
-            </button>
-          </div>
-
-          <button onClick={onProfileClick} className="text-white ml-2">
-            <CircleUser size={26} />
-          </button>
+      {/* Avatar */}
+      <div className="relative">
+        <div className="w-12 h-12 rounded-full overflow-hidden ring-4 ring-purple-500/30 shadow-lg">
+          {selectedUser.profileImage ? (
+            <Image
+              width={48}
+              height={48}
+              src={selectedUser.profileImage}
+              alt={selectedUser.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+              <span className="text-white font-bold text-xl">
+                {getInitials(selectedUser.name)}
+              </span>
+            </div>
+          )}
         </div>
+        {/* Online Indicator */}
+        {selectedUser.status === "Online" && (
+          <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-3 border-black rounded-full shadow-lg animate-pulse"></div>
+        )}
       </div>
+
+      {/* Name + Status */}
+      <div className="min-w-0">
+        <h3 className="text-white font-semibold text-lg truncate">
+          {selectedUser.name}
+        </h3>
+        <p className="text-sm font-medium bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+          {selectedUser.status === "Online" ? "Online" : "Last seen recently"}
+        </p>
+      </div>
+    </div>
+
+    {/* Right Side - Call Buttons + Profile */}
+    <div className="flex items-center gap-2">
+      {/* Audio Call */}
+      <button
+        onClick={() => startCall(false)}
+        className="text-white/80 hover:text-white hover:bg-white/15 p-3 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg backdrop-blur-md"
+        title="Voice Call"
+      >
+        <Phone size={24} strokeWidth={2.2} />
+      </button>
+
+      {/* Video Call */}
+      <button
+        onClick={() => startCall(true)}
+        className="text-white/80 hover:text-white hover:bg-white/15 p-3 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg backdrop-blur-md"
+        title="Video Call"
+      >
+        <Video size={24} strokeWidth={2.2} />
+      </button>
+
+      {/* Profile Info */}
+      <button
+        onClick={onProfileClick}
+        className="text-white/80 hover:text-white hover:bg-white/15 p-3 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg backdrop-blur-md ml-1"
+      >
+        <CircleUser size={26} strokeWidth={2} />
+      </button>
+    </div>
+  </div>
+</div>
+{/* ========== হেডার শেষ ========== */}
 
       {/* Messages */}
       <ScrollArea className="flex-1">
