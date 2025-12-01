@@ -128,39 +128,37 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   // ChatArea.tsx এর ভিতরে startCall ফাংশনটা পুরোটা মুছে এইটা বসাও
+// ChatArea.tsx এর ভিতরে এই ফাংশনটা রাখো
 const startCall = async (isVideo: boolean) => {
   if (!selectedUser?.id) return;
 
-  // একই রুম নাম দুইজনের জন্যই (সর্ট করে নিচ্ছি যাতে দুইজনের একই হয়)
   const participants = [myId, selectedUser.id].sort();
   const roomName = `call_${participants[0]}_${participants[1]}`;
 
-  const identity = myId;
-
   try {
     const res = await fetch(
-      `/api/livekit/token?room=${roomName}&identity=${identity}`
+      `/api/livekit/token?room=${roomName}&identity=${myId}`
     );
+
+    if (!res.ok) throw new Error("Token fetch failed");
+
     const { token } = await res.json();
 
-    if (!token) {
-      alert("Failed to get call token!");
-      return;
-    }
+    if (!token) throw new Error("No token received");
 
-    // কল রিকোয়েস্ট পাঠাও (রুম নাম সহ)
+    // কল রিকোয়েস্ট পাঠাও
     socket?.emit("call-request", {
       callerId: myId,
       receiverId: selectedUser.id,
-      roomName,       // এখানে একই রুম নাম
+      roomName,
       isVideo,
     });
 
-    // নিজেও একই রুমে জয়েন করো
+   
     setCallData({ roomName, token, isVideo });
   } catch (err) {
     console.error(err);
-    alert("Call failed");
+    alert("কল শুরু করতে পারিনি");
   }
 };
 
@@ -940,13 +938,14 @@ const startCall = async (isVideo: boolean) => {
       </div>
 
       {callData && (
-        <CallModal
-          roomName={callData.roomName}
-          token={callData.token}
-          isVideo={callData.isVideo}
-          onClose={() => setCallData(null)}
-        />
-      )}
+  <CallModal
+    roomName={callData.roomName}
+    token={callData.token}
+    isVideo={callData.isVideo}
+    onClose={() => setCallData(null)}
+    callData={callData}   // এই লাইনটা দিতেই হবে
+  />
+)}
     </div>
   );
 };

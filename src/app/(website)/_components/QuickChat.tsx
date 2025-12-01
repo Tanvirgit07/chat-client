@@ -30,11 +30,12 @@ const QuickChat: React.FC = () => {
     roomName: string;
     isVideo: boolean;
   } | null>(null);
-  const [callData, setCallData] = useState<{
-    roomName: string;
-    token: string;
-    isVideo: boolean;
-  } | null>(null);
+ const [callData, setCallData] = useState<{
+  roomName: string;
+  token: string;
+  isVideo: boolean;
+  audio?: boolean;   // ← এটা যোগ করো
+} | null>(null);
 
   const { data: session, status } = useSession();
   // const queryClient = useQueryClient();
@@ -337,41 +338,29 @@ const QuickChat: React.FC = () => {
       </div>
 
       {/* Incoming Call Modal - সবার শেষে */}
-      {incomingCall && (
-        <IncomingCallModal
-          callerName={incomingCall.callerName}
-          callerImage={incomingCall.callerImage}
-          isVideo={incomingCall.isVideo}
-          onAccept={async () => {
-  // এখানে আসল রুম নাম আসবে (caller পাঠিয়েছে)
-  const roomName = incomingCall.roomName;
-  const identity = myId;
-
-  try {
-    const res = await fetch(
-      `/api/livekit/token?room=${roomName}&identity=${identity}`
-    );
-    const { token } = await res.json();
-
-    if (!token) throw new Error("No token");
-
-    socket?.emit("call-accept", {
-      callerId: incomingCall.callerId,
-      roomName,
-    });
-
-    setCallData({ roomName, token, isVideo: incomingCall.isVideo });
-    setIncomingCall(null);
-  } catch (err) {
-    alert("কল জয়েন করতে পারিনি");
-  }
-}}
-          onReject={() => {
-            socket?.emit("call-reject", { callerId: incomingCall.callerId });
-            setIncomingCall(null);
-          }}
-        />
-      )}
+     {incomingCall && (
+  <IncomingCallModal
+    callerName={incomingCall.callerName}
+    callerImage={incomingCall.callerImage}
+    isVideo={incomingCall.isVideo}
+    roomName={incomingCall.roomName}
+    callerId={incomingCall.callerId}
+    myId={myId}
+    socket={socket}
+    onAccept={(token) => {
+      setCallData({
+        roomName: incomingCall.roomName,
+        token,
+        isVideo: incomingCall.isVideo,
+      });
+      setIncomingCall(null);
+    }}
+    onReject={() => {
+      socket?.emit("call-reject", { callerId: incomingCall.callerId });
+      setIncomingCall(null);
+    }}
+  />
+)}
     </div>
   );
 };
